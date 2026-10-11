@@ -12,12 +12,12 @@ export AWS_PROFILE=<perfil> AWS_REGION=us-east-1
 .venv/bin/python -m runner restore [--list]     # revierte fallos inyectados pendientes (bitacora en experiments/reports/.runner-changes.json)
 ```
 
-Reportes: `experiments/reports/<fecha-hora>-<exp>/report.{json,md}`. Exp2/Exp3 piden confirmacion (o `--yes`) y solo actuan sobre recursos
+Reportes: `experiments/reports/<fecha-hora>-<exp>/report.{json,md}`. Exp2 pide confirmacion (o `--yes`) y solo actuan sobre recursos
 cuyo nombre empieza con el prefijo (`voltera-exp2-`, `--prefix`). El config JSON acepta la salida cruda de `terraform output -json`
 y una clave `runner` con overrides (`app_namespace`, `kafka_namespace`, `deployment`, `scaledobject`, `kube_context`, ...).
 Estados por criterio: PASS, FAIL, MANUAL (paso que el runner no puede verificar), SKIP.
 
-Notas: el caso B del Exp. 2 espera `maxReceiveCount x visibilityTimeout` de la cola de comprobantes (180 s por defecto, ~9 min);
-con el `experiment.tfvars.example` de base (40 s) llega a la DLQ en ~2 min. El runner lee el valor real de la cola.
+Notas: en el Exp. 2 (caso B) los comprobantes tardan `maxReceiveCount x visibilityTimeout` de la cola de comprobantes en llegar a la DLQ (180 s por defecto, ~9 min;
+con el `experiment.tfvars.example` de base, 40 s, ~2 min). El runner lee el valor real de la cola. `exp3` es alias de `exp2` (se unieron).
 Apicurio: el runner intenta `curl` desde el pod Kafka (no verificado que la imagen lo traiga); si falla, queda MANUAL
 (alternativa: pod efimero con curl o port-forward, o scripts/register-schemas.sh cuando exista).

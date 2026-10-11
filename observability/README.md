@@ -9,9 +9,9 @@ Todo se provisiona como código; no se crean recursos en AWS.
 | `docker-compose.yml`, `.env.example` | Grafana con versión fija, solo en `127.0.0.1:3000` |
 | `provisioning/datasources/` | CloudWatch (uid `cloudwatch`) y X-Ray (uid `xray`, plugin `grafana-x-ray-datasource`) |
 | `provisioning/dashboards/` | Proveedor de archivos (carpeta "Voltera Exp2") |
-| `dashboards/` | `00-ciclo-en-vivo`, `exp1-absorcion-pico`, `exp2-caida-dependiente`, `exp3-cero-perdida`, `exp4-event-mesh` (schemaVersion 39) |
+| `dashboards/` | `00-ciclo-en-vivo`, `exp1-absorcion-pico`, `exp2-resiliencia` (Exp. 2 unificado: aislamiento + cero pérdida), `exp4-event-mesh` (schemaVersion 39). Los antiguos `exp2-caida-dependiente` y `exp3-cero-perdida` viven en `dashboards/_legacy/` (no se generan por defecto; `--legacy` los regenera ahí) y `docker-compose.yml` oculta esa carpeta a Grafana con un tmpfs |
 | `iam/grafana-readonly-policy.json` | Política IAM de mínimo privilegio |
-| `tools/gen_dashboards.py` | Genera los JSON (`--prefix`, `--cluster`, `--namespace` si cambian los nombres) |
+| `tools/gen_dashboards.py` | Genera los JSON (`--prefix`, `--cluster`, `--namespace` si cambian los nombres; `--legacy` añade los antiguos exp2/exp3 en `dashboards/_legacy/`) |
 
 ## 1. Crear el usuario de solo lectura (ejemplo, NO ejecutado por el agente)
 ```bash
@@ -42,9 +42,10 @@ Opcional: `AWS_CREDENTIALS_FILE=/ruta/otro/archivo` en `.env`.
 - Saldo de conservación = `RUNNING_SUM(inyectadas) - RUNNING_SUM(emitidas) - rechazos de negocio - DLQ(transacciones)`; es positivo mientras hay trabajo en vuelo y debe quedar en 0 al finalizar.
 - Ya no quedan paneles `[PENDIENTE]`; si aparece alguno en el futuro cita su incidencia (OBS-n) en `ORQUESTACION.md`.
 
-## Dashboards para grabar (exp1, exp2, exp3)
-- ~6 paneles cada uno, fila superior de stats con fuente grande, refresh 5 s y rango 15 min. Cada panel trae en su descripción "Qué mirar" y "Patrón de arquitectura". Guion de exposición en `GUION-EXPOSICION.md`.
-- Anotaciones: métrica `FaseExperimento` (namespace `Voltera/Exp2`, dims `experimento`=`exp1|exp2|exp3`, `fase`=`pico_inyectado|fallo_inyectado|recuperacion`, valor 1) que publica el runner. El datasource CloudWatch de Grafana no admite anotaciones por métrica, así que se leen del resultado de los paneles de la fila final "Fuente de anotaciones" (datasource `-- Dashboard --`). Sin verificar en Grafana real.
+## Dashboards para grabar (exp1, exp2 unificado)
+- Exp. 2 (`voltera-exp2-resiliencia`, título "Exp2 - Resiliencia ante fallos"): 4 stats (ingreso EN LINEA, servicio que se cae, emitidas, SALDO) y gráficos A-E (emitidas vs notificadas, colas+DLQ, pods+reenvíos, duplicados/idempotencia, errores Lambda/Step Functions).
+- ~6 paneles cada uno (Exp. 2: 9), fila superior de stats con fuente grande, refresh 5 s y rango 15 min. Cada panel trae en su descripción "Qué mirar" y "Patrón de arquitectura". Guion de exposición en `GUION-EXPOSICION.md`.
+- Anotaciones: métrica `FaseExperimento` (namespace `Voltera/Exp2`, dims `experimento`=`exp1|exp2`, `fase`: exp1 `disparo`; exp2 `estado_inicial|disparo|fallo_dependiente|fallo_pod|fallo_lambda|duplicados|recuperacion`, valor 1, un color por fase) que publica el runner. El datasource CloudWatch de Grafana no admite anotaciones por métrica, así que se leen del resultado de los paneles de la fila final "Fuente de anotaciones" (datasource `-- Dashboard --`). Sin verificar en Grafana real.
 - Nuevas métricas (ms-process-billing): `CiclosReconciliados`, `FacturasReconciliadas`. Lag: `KafkaConsumerLag` Sum/6.
 
 ## Métricas y campos usados

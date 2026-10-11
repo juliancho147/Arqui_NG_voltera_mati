@@ -39,6 +39,14 @@ def _medidas(res: ExperimentResult) -> list[str]:
             pick = sr[::step] + ([sr[-1]] if sr[-1] not in sr[::step] else [])
             L += ["", f"Caso {key[-1]}:", "| Instante | Emitidas | Cola tx | DLQ tx | Cola comp | DLQ comp |", "|---|---|---|---|---|---|"]
             L += [f"| {s['t']} s | {s['emitidas']} | {s['colaTx']} | {s['dlqTx']} | {s['colaComp']} | {s['dlqComp']} |" for s in pick]
+    sf = d.get("serieFallos")
+    if sf:  # exp2 unificado
+        step = max(1, len(sf) // 14)
+        pick = sf[::step] + ([sf[-1]] if sf[-1] not in sf[::step] else [])
+        L += ["", "| Instante | Fase | Emitidas | Enviadas | Pods | Cola tx | DLQ tx | Cola comp | DLQ comp |", "|---|---|---|---|---|---|---|---|---|"]
+        L += [f"| {s['t']} s | {s.get('fase')} | {s['emitidas']} | {s.get('enviadas')} | {s.get('listas')} | {s['colaTx']} | {s['dlqTx']} | {s['colaComp']} | {s['dlqComp']} |" for s in pick]
+        L += ["", "| Criterio | Esperado | Observado |", "|---|---|---|"]
+        L += [f"| {c.id} {_cell(c.title)} | {_cell(c.expected)} | {_cell(c.observed)} |" for c in res.criteria if c.status != MANUAL]
     if not L:
         L = ["", "| Criterio | Esperado | Observado |", "|---|---|---|"]
         L += [f"| {c.id} {_cell(c.title)} | {_cell(c.expected)} | {_cell(c.observed)} |" for c in res.criteria if c.status != MANUAL]

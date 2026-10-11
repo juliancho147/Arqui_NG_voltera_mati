@@ -101,6 +101,36 @@ def consume(ctx: Context, cluster: str, topic: str, *, partition: int | None = N
     return recs
 
 
+def produce(ctx: Context, cluster: str, topic: str, records: list[Record], *, chunk: int = 100) -> dict:
+    """Reenvia registros YA EXISTENTES (misma clave, mismo valor, mismo CloudEvent id) a un topico con kafka-console-producer
+    dentro del broker (`kubectl exec`). Las lineas viajan en base64 por stdin para no depender de quoting.
+    Intenta conservar las cabeceras (parse.headers, Kafka >= 3.2); si el producer las rechaza, reintenta sin ellas.
+    Devuelve {"enviados": n, "conCabeceras": bool, "pod": ...}. Lanza KubeError si ambos intentos fallan."""
+    import base64
+    pod = kafka_pod(ctx, cluster)
+    sent, with_headers = 0, True
+    for i in range(0, len(records), chunk):
+        part = records[i:i + chunk]
+        for headers in (True, False):
+            lines = []
+            for r in part:
+                key = r.key or (r.value or {}).get("facturaid") or ""
+                hdr = ",".join(f"{k}:{v}" for k, v in (r.headers or {}).items()) or "origen:runner"
+                lines.append(("\t".join([hdr, key, r.raw]) if headers else "\t".join([key, r.raw])))
+            b64 = base64.b64encode(("\n".join(lines) + "\n").encode()).decode()
+            props = "--property parse.key=true" + (" --property parse.headers=true" if headers else "")
+            script = (f"echo {b64} | base64 -d | {KAFKA_BIN}/kafka-console-producer.sh --bootstrap-server {BOOTSTRAP_LOCAL} "
+                      f"--topic {topic} {props}")
+            res = ctx.kube.exec(ctx.cfg.kafka_namespace, pod, ["sh", "-c", script], timeout=120, check=False)
+            if res.returncode == 0:
+                with_headers = with_headers and headers
+                sent += len(part)
+                break
+            if not headers:
+                raise KubeError(f"kafka-console-producer fallo: {res.stderr.strip()[:300]}")
+    return {"enviados": sent, "conCabeceras": with_headers, "pod": pod, "topic": topic}
+
+
 def consumer_lag(ctx: Context, cluster: str, group: str) -> int | None:
     """Lag total del grupo (suma de la columna LAG) o None si no se puede leer."""
     try:

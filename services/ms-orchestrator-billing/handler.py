@@ -7,7 +7,9 @@ Disparo: EventBridge (CierreDeMes; detail opcional {cicloId, nSolicitudes}) o in
 Los eventId son deterministas (uuid5): un re-disparo del mismo ciclo no duplica el outbox (escritura condicional).
 """
 import os
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 import uuid
 from datetime import datetime, timezone
 
@@ -98,6 +100,7 @@ def handler(event, context):
         iniciadoEn=datetime.now(timezone.utc).isoformat(timespec="seconds"),
     )
     nuevos = int(_put_once(outbox, _outbox_item(inicio, "EVENTOS")))
+    items = []
     for i, tx in enumerate(sorted(txs, key=lambda t: t["facturaId"]), start=1):
         extra = {k: tx[k] for k in ("clienteId", "tipoTarifa", "periodo") if tx.get(k) is not None}
         if tx.get("retardoSegundos") is not None:
@@ -106,7 +109,18 @@ def handler(event, context):
             "ConsumoFacturablePreparado", SERVICE, ciclo, tx["facturaId"],
             event_id=det_id("consumo", tx["facturaId"]), ordinal=i, totalUnidades=total, **extra,
         )
-        nuevos += int(_put_once(outbox, _outbox_item(ev, "INGRESO")))
+        items.append(_outbox_item(ev, "INGRESO"))
+
+    # Escrituras en paralelo: 1500 PutItem secuenciales superaban el timeout de la Lambda (30 s) y dejaban el lote incompleto.
+    local = threading.local()
+
+    def put(item: dict) -> bool:
+        if not hasattr(local, "table"):
+            local.table = boto3.session.Session().resource("dynamodb").Table(os.environ["TABLE_OUTBOX"])
+        return _put_once(local.table, item)
+
+    with ThreadPoolExecutor(max_workers=int(os.environ.get("OUTBOX_WORKERS", "16"))) as pool:
+        nuevos += sum(int(r) for r in pool.map(put, items))
 
     metrics.add_metric(name="UnidadesEnOutbox", unit=MetricUnit.Count, value=total)
     logger.info("ciclo iniciado", extra={"total": total, "itemsNuevosOutbox": nuevos})

@@ -90,7 +90,9 @@ def main() -> None:
 
     # OBS-6: HealthCheckOk (1/0) en cada volcado = referencia de "servicio en linea".
     def pre_flush() -> None:
-        metrics.add("HealthCheckOk", 1 if check()["ok"] else 0, dims={"pod": pod})
+        # Un apagado ordenado (SIGTERM: KEDA baja replicas, rollout) NO es una caida: no se reporta salud 0 mientras `stop` este activo.
+        if not stop.is_set():
+            metrics.add("HealthCheckOk", 1 if check()["ok"] else 0, dims={"pod": pod})
         lag_hook()  # KafkaConsumerLag (service+topic) de las particiones asignadas a este pod
 
     metrics.pre_flush = pre_flush

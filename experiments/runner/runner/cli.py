@@ -1,4 +1,4 @@
-"""CLI: python -m runner exp1|exp2|exp3|exp4|all|restore|demo <exp> [opciones]."""
+"""CLI: python -m runner exp1|exp2|exp4|all|restore|demo <exp> [opciones]  (exp3 = alias de exp2)."""
 from __future__ import annotations
 
 import argparse
@@ -8,16 +8,16 @@ from pathlib import Path
 from . import actions
 from .config import REPORTS_DIR, ConfigError, load_config
 from .context import Context
-from .demo import Grafana, apply_demo_defaults, run_demo
+from .demo import ALIASES, Grafana, apply_demo_defaults, run_demo
 from .experiments.exp1 import Exp1
 from .experiments.exp2 import Exp2
-from .experiments.exp3 import Exp3
 from .experiments.exp4 import Exp4
 from .report import write_report
 from .resultados import RESULTADOS_PATH
 from .safety import Aborted, SafetyError
 
-EXPERIMENTS = {"exp1": Exp1, "exp2": Exp2, "exp3": Exp3, "exp4": Exp4}
+EXPERIMENTS = {"exp1": Exp1, "exp2": Exp2, "exp4": Exp4}   # exp3 es alias de exp2 (ver demo.ALIASES)
+ALIAS_AVISO = "AVISO: el antiguo Exp. 3 (cero perdida) se unio al Exp. 2 (Resiliencia ante fallos: aislamiento + cero perdida); se ejecuta exp2."
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -34,24 +34,27 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--kube-context", default=None, help="contexto de kubectl")
     g.add_argument("--reports-dir", default=str(REPORTS_DIR))
     t = common.add_argument_group("ajustes de experimentos")
-    t.add_argument("--delay", type=float, default=None, help="retardo simulado por mensaje (s) en process-billing (exp1/exp3)")
+    t.add_argument("--delay", type=float, default=None, help="retardo simulado por mensaje (s) en process-billing (exp1/exp2)")
     t.add_argument("--sla", type=float, default=None, help="SLA del lote en s (exp1)")
-    t.add_argument("--fault-mode", choices=["env", "concurrency"], default="env", help="exp2/3: FORCE_FAIL=true o concurrencia reservada 0")
-    t.add_argument("--case", choices=["A", "B", "a", "b"], default=None, help="exp2: solo el caso A (ms-tarifas) o B (ms-comprobante-factura)")
+    t.add_argument("--fault-mode", choices=["env", "concurrency"], default="env", help="exp2: FORCE_FAIL=true o concurrencia reservada 0")
+    t.add_argument("--case", choices=["A", "B", "a", "b"], default=None, help="exp2: dependiente que cae: A (ms-tarifas) o B (ms-comprobante-factura, defecto)")
     t.add_argument("--timeout", type=float, default=None, help="tope de espera principal en s")
     t.add_argument("--poll", type=float, default=None, help="intervalo de muestreo en s")
     t.add_argument("--scaledown-timeout", type=float, default=None)
     t.add_argument("--skip-scaledown", action="store_true")
-    t.add_argument("--fault-window", type=float, default=None, help="exp3: segundos con el comprobante caido")
-    t.add_argument("--graceful", action="store_true", help="exp3: apagado ordenado del pod en vez de --force --grace-period=0")
+    t.add_argument("--fault-window", type=float, default=None, help="exp2: segundos que dura el fallo parcial (FAIL_RATE) en ms-facturacion")
+    t.add_argument("--graceful", action="store_true", help="exp2: apagado ordenado del pod en vez de --force --grace-period=0")
     t.add_argument("--no-dispatch", action="store_true", help="exp4: auditar un ciclo ya ejecutado")
     t.add_argument("--asyncapi", default=None)
     t.add_argument("--sla-per-msg", dest="sla_per_msg", type=float, default=None, help="exp1: SLA = max(base, N x este valor en s/mensaje)")
     t.add_argument("--sla-factor", dest="sla_factor", type=float, default=None, help="exp1 con --sla-scale/demo: holgura sobre el ideal N*delay/replicas_max (1.5)")
     t.add_argument("--sla-scale", dest="sla_scale", action="store_true", help="exp1: SLA proporcional a N (siempre activo en demo)")
-    t.add_argument("--time-per-msg", dest="time_per_msg", type=float, default=None, help="segundos extra de timeout por mensaje sobre 10 (exp2/exp3)")
-    t.add_argument("--fail-rate", dest="fail_rate", type=float, default=None, help="exp3: FAIL_RATE (0..1) en ms-facturacion durante el pico (0 = sin fallo parcial; defecto 0.25)")
-    t.add_argument("--kill-pods", dest="kill_pods", type=int, default=None, help="exp3: cuantos pods de process-billing matar (defecto 1)")
+    t.add_argument("--time-per-msg", dest="time_per_msg", type=float, default=None, help="segundos extra de timeout por mensaje sobre 10 (exp2)")
+    t.add_argument("--fail-rate", dest="fail_rate", type=float, default=None, help="exp2: FAIL_RATE (0..1) en ms-facturacion durante la ventana (0 = sin fallo parcial; defecto 0.25)")
+    t.add_argument("--kill-pods", dest="kill_pods", type=int, default=None, help="exp2: cuantos pods de process-billing matar (defecto 1)")
+    t.add_argument("--dupl", "--duplicates", dest="dupl", type=int, default=None, help="exp2: copias de mensajes ya enviados que se reenvian a proposito por SQS y Kafka (defecto 50; 0 = omitir)")
+    t.add_argument("--observe", type=float, default=None, help="exp2: segundos de observacion tras inyectar el fallo del dependiente (defecto 30)")
+    t.add_argument("--timeout-metricas", dest="timeout_metricas", type=float, default=None, help="exp2: espera maxima (s) a que CloudWatch refleje replays/duplicados (defecto 150)")
 
     d = argparse.ArgumentParser(add_help=False)
     dg = d.add_argument_group("demo")
@@ -66,8 +69,9 @@ def build_parser() -> argparse.ArgumentParser:
     for name, cls in EXPERIMENTS.items():
         sub.add_parser(name, parents=[common], help=cls.title)
     dm = sub.add_parser("demo", parents=[common, d], help="modo demo para grabar UN experimento: pausas, banners, marcas y RESULTADOS.md")
-    dm.add_argument("exp", choices=["exp1", "exp2", "exp3"])
-    sub.add_parser("all", parents=[common], help="exp1 a exp4 en orden")
+    dm.add_argument("exp", choices=["exp1", "exp2", "exp3"], help="exp3 es alias de exp2")
+    sub.add_parser("exp3", parents=[common], help="alias de exp2 (se unio al Exp. 2)")
+    sub.add_parser("all", parents=[common], help="exp1, exp2 y exp4 en orden")
     rs = sub.add_parser("restore", parents=[common], help="revierte los cambios pendientes de la bitacora (fallos inyectados)")
     rs.add_argument("--list", action="store_true", help="solo listar los cambios registrados")
     return p
@@ -75,7 +79,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _options(a) -> dict:
     keys = ["delay", "sla", "fault_mode", "case", "timeout", "poll", "scaledown_timeout", "skip_scaledown", "fault_window",
-            "graceful", "no_dispatch", "asyncapi", "sla_per_msg", "sla_factor", "sla_scale", "time_per_msg", "fail_rate", "kill_pods"]
+            "graceful", "dupl", "observe", "timeout_metricas", "no_dispatch", "asyncapi", "sla_per_msg", "sla_factor", "sla_scale", "time_per_msg", "fail_rate", "kill_pods"]
     return {k: getattr(a, k) for k in keys if getattr(a, k, None) is not None and getattr(a, k, None) is not False}
 
 
@@ -118,6 +122,12 @@ def main(argv: list[str] | None = None, *, ctx_factory=None) -> int:
         except (Aborted, SafetyError) as exc:
             print(f"Abortado: {exc}", file=sys.stderr)
             return 2
+    if a.cmd in ALIASES:
+        print(ALIAS_AVISO, file=sys.stderr)
+        a.cmd = ALIASES[a.cmd]
+    if a.cmd == "demo" and a.exp in ALIASES:
+        print(ALIAS_AVISO, file=sys.stderr)
+        a.exp = ALIASES[a.exp]
     names = list(EXPERIMENTS) if a.cmd == "all" else [a.cmd]
     n = a.n or ctx.cfg.n_default
     base_ciclo = a.ciclo_id or actions.new_ciclo_id()

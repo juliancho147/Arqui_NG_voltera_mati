@@ -246,3 +246,48 @@ def account(ctx: Context, ciclo: str, inyectadas: list[str] | None = None) -> Ac
     qt, qc = ctx.cfg.queue("transacciones"), ctx.cfg.queue("comprobantes")
     acc.colas = {"transacciones": queue_state(ctx, qt["url"]), "comprobantes": queue_state(ctx, qc["url"])}
     return acc
+
+
+# ----------------------------------------------------------------------------- conteo de duplicados descartados / replays
+def metric_sum(ctx: Context, name: str, since: float, until: float | None = None, service_contains: tuple[str, ...] = ()) -> float | None:
+    """Suma de una metrica del namespace Voltera/Exp2 entre `since` y `until` (epoch del reloj del contexto). None si no se puede leer.
+    CloudWatch tarda 1-2 min en reflejar datos nuevos."""
+    from datetime import datetime, timezone
+    try:
+        cw = ctx.client("cloudwatch")
+        total, token = 0.0, None
+        metrics = []
+        while True:
+            kw = {"Namespace": "Voltera/Exp2", "MetricName": name}
+            if token:
+                kw["NextToken"] = token
+            r = cw.list_metrics(**kw)
+            metrics += r.get("Metrics", [])
+            token = r.get("NextToken")
+            if not token:
+                break
+        for m in metrics:
+            svc = next((d["Value"] for d in m.get("Dimensions", []) if d["Name"] == "service"), "")
+            if service_contains and not any(x in svc for x in service_contains):
+                continue
+            pts = cw.get_metric_statistics(
+                Namespace="Voltera/Exp2", MetricName=name, Dimensions=m.get("Dimensions", []), Period=60, Statistics=["Sum"],
+                StartTime=datetime.fromtimestamp(since - 60, tz=timezone.utc),
+                EndTime=datetime.fromtimestamp((until if until is not None else ctx.clock()) + 60, tz=timezone.utc)).get("Datapoints", [])
+            total += sum(p["Sum"] for p in pts)
+        return total
+    except Exception as exc:  # noqa: BLE001 - la lectura de metricas es evidencia complementaria
+        ctx.log(f"aviso: no se pudo leer la metrica {name} ({type(exc).__name__})")
+        return None
+
+
+def duplicates_in_logs(ctx: Context, ciclo: str, since_seconds: int) -> int | None:
+    """Cuenta en los logs de los pods de ms-process-billing las lineas 'mensaje duplicado descartado' de este ciclo. None si kubectl falla."""
+    try:
+        res = ctx.kube.run(["logs", "-n", ctx.cfg.app_namespace, "-l", f"app.kubernetes.io/name={ctx.cfg.deployment}",
+                            f"--since={max(60, int(since_seconds))}s", "--tail=-1", "--prefix"], timeout=120, check=False)
+    except Exception:  # noqa: BLE001
+        return None
+    if res.returncode != 0:
+        return None
+    return sum(1 for l in res.stdout.splitlines() if "mensaje duplicado descartado" in l and ciclo in l)

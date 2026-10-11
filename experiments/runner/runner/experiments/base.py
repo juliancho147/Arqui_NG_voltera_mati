@@ -13,6 +13,7 @@ class Experiment:
     title = ""
     hypothesis = ""
     mutates = False  # True => pide confirmacion
+    verdict_phase_inside = False  # True => execute() abre la fase `veredicto` y calcula ahi los criterios finales
 
     def __init__(self, ctx: Context, n: int, ciclo_id: str):
         self.ctx, self.n, self.ciclo_id = ctx, n, ciclo_id
@@ -40,7 +41,8 @@ class Experiment:
             self.ctx.confirm(self.mutations())
         try:
             self.execute(r)
-            self.ctx.phase("veredicto", "Contabilidad final y criterios PASS/FAIL")
+            if not self.verdict_phase_inside:
+                self.ctx.phase("veredicto", "Contabilidad final y criterios PASS/FAIL")
         except Exception as exc:  # noqa: BLE001 - el reporte debe generarse siempre
             r.error = f"{type(exc).__name__}: {exc}\n{traceback.format_exc(limit=6)}"
             self.ctx.log(f"ERROR en {self.name}: {exc}")

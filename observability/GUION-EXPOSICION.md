@@ -1,13 +1,13 @@
 # Guion de exposición — Experimentación 2 (Voltera)
 
-Tres guiones de 6 a 8 minutos, uno por experimento, para grabar sobre los dashboards `exp1-absorcion-pico`, `exp2-caida-dependiente` y `exp3-cero-perdida` (carpeta "Voltera Exp2" en Grafana).
+Dos guiones de 6 a 8 minutos (Exp. 1 y Exp. 2 unificado) para grabar sobre los dashboards `exp1-absorcion-pico` y `exp2-resiliencia` (los antiguos Exp. 2 y Exp. 3 se unieron; sus JSON están en `dashboards/_legacy/` y solo se regeneran con `--legacy`) (carpeta "Voltera Exp2" en Grafana).
 
 ## Antes de grabar (común)
 - Grafana en `http://localhost:3000`, pantalla completa (tecla `d` + `k` activa el modo kiosco), refresh de 5 s y rango de 15 min ya vienen por defecto. Navegador al 100 % o 125 %.
 - CloudWatch publica con 1 a 2 minutos de retraso: lo que se dispara en el segundo 0 se ve en pantalla hacia el minuto 1-2. Narra con calma en ese hueco (el guion lo prevé) o graba la corrida y sincroniza después.
 - Las métricas de la aplicación no llevan `cicloId`: se acota con el rango de tiempo. Haz **una corrida limpia por experimento** (ventana de 15 min sin otras corridas).
-- Las líneas verticales "Pico inyectado", "Fallo inyectado" y "Recuperación" salen de la métrica `FaseExperimento` (namespace `Voltera/Exp2`, dimensiones `experimento` = `exp1|exp2|exp3` y `fase` = `pico_inyectado|fallo_inyectado|recuperacion`, valor 1, el runner la publica). **Pendiente de verificar en Grafana real** que la anotación se dibuje (usa la fuente "-- Dashboard --" sobre los paneles de la fila final "Fuente de anotaciones", que no se explican en cámara; si no se dibuja, esos paneles muestran igualmente los instantes).
-- Orden de lectura en los tres tableros: fila superior de números grandes (izquierda a derecha), luego los gráficos de arriba-izquierda a abajo-derecha. En los gráficos de series el eje X siempre es la hora local; el eje Y está rotulado en cada gráfico.
+- Las líneas verticales de fase salen de la métrica `FaseExperimento` (namespace `Voltera/Exp2`, dimensiones `experimento` = `exp1|exp2` y `fase`, valor 1, la publica el runner). Exp1: `disparo`. Exp2: `estado_inicial`, `disparo`, `fallo_dependiente`, `fallo_pod`, `fallo_lambda`, `duplicados`, `recuperacion` (colores distintos). **Pendiente de verificar en Grafana real** que la anotación se dibuje (usa la fuente "-- Dashboard --" sobre los paneles de la fila final "Fuente de anotaciones", que no se explican en cámara; si no se dibuja, esos paneles muestran igualmente los instantes).
+- Orden de lectura en los dos tableros: fila superior de números grandes (izquierda a derecha), luego los gráficos de arriba-izquierda a abajo-derecha. En los gráficos de series el eje X siempre es la hora local; el eje Y está rotulado en cada gráfico.
 
 ---
 
@@ -27,7 +27,7 @@ EventBridge → `ms-orchestrator-billing` → tabla outbox → Streams → relay
 Tablero en reposo: números en 0 o sin datos, 1 réplica, lag en 0. Di: "un pod, cola vacía, ninguna factura".
 
 ## 4. Disparo (30 s)
-`python -m runner exp1 --n 100` (o `--n 200`; el retardo simulado de 2 s por mensaje fuerza el backlog). Aparece la anotación naranja "Pico inyectado".
+`python -m runner exp1 --n 100` (o `--n 200`; el retardo simulado de 2 s por mensaje fuerza el backlog). Aparece la anotación naranja "Disparo".
 
 ## 5. Narración gráfico por gráfico (3 min)
 
@@ -36,7 +36,7 @@ Tablero en reposo: números en 0 o sin datos, 1 réplica, lag en 0. Di: "un pod,
 | 1 | **Tiempo del lote en segundos (SLA: 120 s)** — stat, arriba izquierda | Un valor, en segundos | "Es la nota final: cuánto tardó el lote. Verde si ≤ 120 s, rojo si no." Se llena al final, con el retraso de CloudWatch. | SLA de cierre de ciclo / criterio del ASR |
 | 2 | **Réplicas escaladas (pico)** — stat, arriba centro | Un valor, número de pods (máximo del rango) | "Pasamos de 1 pod a 5 sin que nadie interviniera." | Autoescalado por evento (KEDA) |
 | 3 | **Mensajes pendientes al llegar el pico (máximo)** — stat, arriba derecha | Un valor, mensajes (lag máximo) | "Este es el tamaño del pico que tuvo que absorber la cola." | Queue-Based Load Leveling |
-| 4 | **Pendientes por procesar (lag) y réplicas que escalan** — serie ancha | X: hora. Y izquierdo: mensajes pendientes. Y derecho: réplicas (línea naranja gruesa) | "La anotación marca el pico: el lag salta de golpe. Unos 35 s después las réplicas suben 1, 4, 5. Mientras hay 5, el lag baja en rampa hasta 0, y luego las réplicas vuelven a 1." | Queue-Based Load Leveling + Competing Consumers + autoescalado por evento (lagThreshold 2). Lag = `KafkaConsumerLag` Sum/6 |
+| 4 | **Pendientes por procesar (lag) y réplicas que escalan** — serie ancha | X: hora. Y izquierdo: mensajes pendientes. Y derecho: réplicas (línea naranja gruesa) | "La anotación marca el disparo: el lag salta de golpe. Unos 35 s después las réplicas suben 1, 4, 5. Mientras hay 5, el lag baja en rampa hasta 0, y luego las réplicas vuelven a 1." | Queue-Based Load Leveling + Competing Consumers + autoescalado por evento (lagThreshold 2). Lag = `KafkaConsumerLag` Sum/6 |
 | 5 | **Facturas emitidas acumuladas (el lote avanza)** — serie, abajo izquierda | X: hora. Y: facturas acumuladas | "Dos curvas: la meta (inyectadas) y las emitidas. El punto donde la segunda alcanza a la primera es el fin del lote." | Cero pérdida por saturación (durable messaging) |
 | 6 | **Tiempo por mensaje en segundos (total y sobrecosto)** — serie, abajo derecha | X: hora. Y: segundos por mensaje | "El total ronda el retardo simulado de 2 s; el sobrecosto es lo que añade nuestra mensajería (claim, SQS, commit) y debe ser pequeño. Si el lote se pasó del SLA, esta curva nos dice que la demora no viene del servicio sino del escalado y del reparto de claves entre particiones." | Medición del costo de la mensajería durable |
 
@@ -49,77 +49,63 @@ Lee el número 1. Con los datos reales de la sesión del 2026-10-10: N=10 → **
 
 ---
 
-# Experimento 2 — Caída de un dependiente sin detener el negocio
+# Experimento 2 — Resiliencia ante fallos (aislamiento + cero pérdida)
 
-**Dashboard:** `Exp2 - Caida de un dependiente (aislamiento)` · **Duración:** 8 min
+**Dashboard:** `Exp2 - Resiliencia ante fallos` (uid `voltera-exp2-resiliencia`, http://localhost:3000/d/voltera-exp2-resiliencia) · **Duración:** 8 min
 
-## 1. Hipótesis y criterio (1 min)
-- **Hipótesis:** si se degrada un dependiente (caso a: `ms-tarifas`; caso b: `ms-comprobante-factura`, que simula al tercero), las transacciones afectadas se reintentan y, al agotar reintentos, caen a la DLQ. El resto del flujo sigue y el ingreso sigue encolando. Al recuperarse, la DLQ se reprocesa.
-- **Criterio:** facturas emitidas siguen subiendo durante el fallo; lo fallido queda en DLQ (no se pierde); tras el redrive la DLQ vuelve a 0; el ingreso permanece en línea.
-
-## 2. Mapa del flujo (1 min)
-Kafka → `process-billing` → **cola de transacciones** → Pipe → **Step Functions** (Retry ×3, backoff ×2, Catch → DLQ) → tarifas → cálculo → facturación → **cola de comprobantes** → `ms-comprobante-factura`. Señala los dos bulkheads: colas separadas y concurrencia por Lambda.
-
-## 3. Estado inicial (30 s)
-DLQ en 0, "EN LINEA" en verde, facturas emitidas en 0 o plano, colas vacías.
-
-## 4. Disparo (1 min)
-`python -m runner exp2 --case b` (o `a`). El runner inyecta el fallo (`FORCE_FAIL=true` o concurrencia reservada 0): anotación roja "Fallo inyectado". Más adelante restaura el servicio y ejecuta el redrive: anotación verde "Recuperación".
-
-## 5. Narración gráfico por gráfico (4 min)
-
-| # | Gráfico (posición) | Eje X / eje Y | Qué decir | Patrón de arquitectura |
-|---|---|---|---|---|
-| 1 | **Mensajes atascados en DLQ (lo que falló de verdad)** — stat, arriba izquierda | Un valor, mensajes (DLQ transacciones + DLQ comprobantes) | "Empieza en 0. Cuando se agotan los reintentos sube: es lo que realmente falló, apartado sin perderse." | Dead Letter Queue |
-| 2 | **Facturas emitidas (siguen subiendo)** — stat, arriba centro | Un valor, facturas en el rango | "El contador no se congela por el fallo: el negocio sigue." | Bulkhead |
-| 3 | **Servicios en línea (ms-process-billing)** — stat, arriba derecha | EN LINEA / CAIDO | "El ingreso nunca se cayó: no depende del dependiente degradado." | Mensajería asíncrona (desacople productor/consumidor) |
-| 4 | **Cola y DLQ del dependiente caído** — serie, izquierda | X: hora. Y: mensajes en cola | "Tras la línea roja, la cola del dependiente (o la DLQ de transacciones en el caso a) crece. Tras la línea verde baja a 0: eso es el redrive." | Queue-Based Load Leveling + Retry con backoff + DLQ |
-| 5 | **Facturas emitidas y notificadas (acumulado)** — serie, derecha | X: hora. Y: facturas acumuladas | "Emitidas sigue subiendo durante el fallo. Notificadas se aplana si cae el comprobante y alcanza a emitidas después de la recuperación." | Bulkhead + desacople por cola (emitir no espera a notificar) |
-| 6 | **Errores de Step Functions y reintentos** — serie ancha, abajo | X: hora. Y: eventos por minuto | "Los errores de Lambda son los reintentos del backoff. Las ejecuciones 'fallidas' casi no se mueven porque el Catch manda a la DLQ y la ejecución termina bien: el fallo quedó contenido." | Retry con backoff + Catch → DLQ en la orquestación (Step Functions) |
-
-## 6. Veredicto (30 s)
-Cumple si: (1) el número 2 siguió subiendo con el fallo activo, (2) el número 1 pasó por valores > 0 y terminó en 0 tras la recuperación, (3) el número 3 nunca marcó CAIDO. Caso b: con `maxReceiveCount` 3 y visibility timeout 180 s tarda ≥ 9 min en llegar a DLQ; usa el valor reducido (~40 s) de `experiment.tfvars.example` para que quepa en la grabación.
-
-## 7. Qué demuestra y qué no (30 s)
-- **Demuestra:** aislamiento de fallos, apartado en DLQ sin pérdida, y reproceso tras recuperar.
-- **No demuestra:** protección de servicios de tiempo real (se aproxima con el salud del ingreso y colas separadas) ni comportamiento ante un tercero real; "servicios en línea" es la salud de `process-billing`, no un endpoint de tiempo real.
-
----
-
-# Experimento 3 — Cero pérdida de solicitudes ante fallos
-
-**Dashboard:** `Exp3 - Cero perdida de solicitudes` · **Duración:** 8 min
+Un solo escenario, un solo tablero. Une los antiguos Exp. 2 (caída de un dependiente) y Exp. 3 (cero pérdida): se inyectan, uno tras otro, una caída de dependiente, la muerte de pods, una falla de Lambda y duplicados a propósito, y se demuestra que el ingreso no se cae y que el saldo vuelve a 0.
 
 ## 1. Hipótesis y criterio (1 min)
-- **Hipótesis:** si un consumidor muere a mitad de proceso, los mensajes no confirmados se reentregan y la idempotencia evita facturas duplicadas.
-- **Criterio (ecuación de conservación):** `inyectadas = emitidas + rechazadas por negocio + en DLQ`, saldo final 0, cero facturas duplicadas.
+- **Hipótesis:** ante fallos de distinto tipo, `ms-process-billing` (el ingreso) sigue en línea, lo que no se puede procesar se reintenta y luego se aparta en DLQ, los mensajes no confirmados se reentregan y los duplicados no generan facturas repetidas.
+- **Criterio (ecuación de conservación):** `inyectadas = emitidas + rechazadas por negocio + en DLQ`; saldo final 0; ingreso EN LINEA todo el tiempo; facturas emitidas sin duplicados.
 
-## 2. Mapa del flujo (1 min)
-Orchestrator → **outbox** (DynamoDB) → Streams → relay → Kafka → **`process-billing`** (dedup de ingreso) → SQS → Step Functions → **`ms-facturacion`** (idempotencia por factura) → cola de comprobantes → **`ms-comprobante-factura`** (idempotencia por entrega). Marca las tres capas de idempotencia y el outbox.
+## 2. Mapa del flujo (30 s)
+Orchestrator → outbox → relay → Kafka → **`ms-process-billing`** → cola de transacciones → Step Functions (Retry ×3, backoff, Catch → DLQ) → tarifas → cálculo → **`ms-facturacion`** → cola de comprobantes → **`ms-comprobante-factura`**. Señala los bulkheads (colas separadas, Lambdas independientes) y las capas de idempotencia.
 
-## 3. Estado inicial (30 s)
-Todo en 0; SALDO en verde con 0.
+## 3. Fases en orden (el runner las publica como `FaseExperimento`; cada una es una línea vertical de color)
 
-## 4. Disparo (1 min)
-`python -m runner exp3` (borra el pod de `process-billing` con mensajes en vuelo y falla `ms-comprobante-factura` a mitad). Anotación roja "Fallo inyectado (pod muerto)" y, al restaurar, verde "Recuperación".
-
-## 5. Narración gráfico por gráfico (4 min)
-
-| # | Gráfico (posición) | Eje X / eje Y | Qué decir | Patrón de arquitectura |
+| # | Fase (color) | Qué ocurre | Qué narrar | Qué mirar |
 |---|---|---|---|---|
-| 1 | **Solicitudes inyectadas** — stat, arriba izquierda | Un valor, solicitudes | "Lado izquierdo de la ecuación: lo que entró." | Transactional Outbox |
-| 2 | **Emitidas + rechazadas + en DLQ** — stat, arriba centro-izq. | Un valor, solicitudes | "Lado derecho: todo lo que terminó en algún estado final conocido." | At-least-once + DLQ (conservación) |
-| 3 | **SALDO (inyectadas − contabilizadas)** — stat grande, arriba centro-der. | Un valor; 0 = verde | "Este es el veredicto en un número. Se pone naranja mientras hay trabajo en vuelo y debe volver a 0." | Verificación de cero pérdida |
-| 4 | **Ciclos y facturas reconciliados** — stat, arriba derecha | Cuatro valores (completados, fallidos, reconciliados, facturas reconciliadas) | "Completado sube al cerrar el ciclo, fallidos debe ser 0. Reconciliados > 0 significa que se perdió un evento de estado y la reconciliación contra DynamoDB cerró el ciclo: se perdió información de observación, no una factura." | Reconciliación / compensación periódica |
-| 5 | **Conservación en el tiempo: inyectadas vs contabilizadas** — serie, abajo izquierda | X: hora. Y: solicitudes acumuladas | "Las dos curvas se separan durante el fallo y se vuelven a juntar. Una separación que no cierra sería una pérdida." | Durable Messaging (Kafka/SQS) + outbox |
-| 6 | **Reintentos, duplicados descartados y replays** — serie, abajo derecha | X: hora. Y: eventos por minuto | "Tras la línea roja aparecen reenvíos y duplicados: el sistema entrega más de una vez, pero cada duplicado se descarta o se repite sin re-emitir. Por eso el saldo sigue en 0." | At-least-once + consumidor idempotente (dedup de ingreso, idempotencia en facturación y comprobante) |
+| 1 | `estado_inicial` (gris) | Todo en reposo | "Ingreso en línea, saldo 0, colas vacías." | Stats: EN LINEA verde, errores 0, SALDO 0 verde |
+| 2 | `disparo` (naranja) | Se inyecta el lote | "Entran las facturas; el outbox las registra antes de publicarlas." | Stat de emitidas empieza a subir; gráfico A |
+| 3 | `fallo_dependiente` (rojo) | Cae `ms-comprobante-factura` (o `ms-tarifas` en el caso A) | "Un dependiente cae: sus errores suben, pero el ingreso sigue en línea y se siguen emitiendo facturas. Emitir no espera a notificar." | Stat 2 (errores) en rojo; gráfico A (notificadas se aplana, emitidas sigue); gráfico B (crece la cola o DLQ del caído) |
+| 4 | `fallo_pod` (morado) | Se matan pods de `ms-process-billing` | "Matamos pods en pleno proceso: Kubernetes los repone y Kafka reentrega lo que no se confirmó." | Gráfico C (pods bajan y suben; `MensajesReenviados` > 0); stat 1 sigue EN LINEA |
+| 5 | `fallo_lambda` (amarillo) | `FAIL_RATE` en `ms-facturacion` | "Una de cada cuatro invocaciones falla: Retry con backoff y, si se agota, DLQ." | Gráfico E (errores de Lambda; Step Functions casi plano); gráfico B |
+| 6 | `duplicados` (azul) | Se reenvían copias a propósito por SQS y Kafka | "Entregamos todo dos veces a propósito. Los contadores de duplicados suben, pero las facturas emitidas no se repiten." | Gráfico D (única fase donde `MensajesDuplicados` e `IdempotenciaReplays` > 0); SALDO sigue en 0 |
+| 7 | `recuperacion` (verde) | Se restaura el servicio y se hace redrive | "Todo vuelve: las colas se drenan, notificadas alcanza a emitidas, la DLQ queda en 0." | Gráfico B a 0; gráfico A (curvas juntas); SALDO 0 verde |
 
-## 6. Veredicto (30 s)
-Aprobado si: número 3 en 0 y verde al final, número 4 con "ciclos fallidos" = 0, y el gráfico 6 mostró reentregas o replays (prueba de que el fallo realmente ocurrió). Hallazgo conocido: en la prueba de N=200 una factura se procesó de punta a punta pero su evento de estado se perdió; el ciclo quedó EN_CURSO. La reconciliación (`CiclosReconciliados`, `FacturasReconciliadas`) está diseñada para cerrar ese caso; si en la grabación no aparece, el número 4 lo evidencia.
+Disparo: `python -m runner demo exp2` (o `python -m runner exp2 --case b|a`).
 
-## 7. Qué demuestra y qué no (30 s)
-- **Demuestra:** no se pierde ninguna solicitud ante la muerte de un consumidor, y los reintentos no duplican facturas.
-- **No demuestra:** tolerancia a la pérdida de un broker (Kafka corre con 1 broker, factor de replicación 1), ni ausencia de pérdidas de eventos de observabilidad (publicación al mesh best-effort), ni escala real.
+## 3b. Cómo narrar el "Estado de los servicios en el tiempo" (protagonista, ancho completo bajo los stats)
+State timeline: una fila por servicio (`ms-process-billing`, `ms-tarifas`, `ms-calculo-consumo-neto`, `ms-facturacion`, `ms-comprobante-factura`), eje X = hora; verde OK, amarillo DEGRADADO, rojo OFF. Narra con el cursor sobre la línea de tiempo: "en este minuto el servicio está OK y en el siguiente está OFF".
+1. Primero todo verde (`estado_inicial`, `disparo`).
+2. `fallo_dependiente`: la fila de `ms-comprobante-factura` pasa a rojo OFF; las demás siguen verdes ("el fallo queda aislado").
+3. `fallo_lambda`: `ms-facturacion` pasa a amarillo DEGRADADO (falla una parte de las invocaciones, no todas).
+4. `fallo_pod`: `ms-process-billing` pasa a amarillo DEGRADADO (menos pods o reentregas) pero nunca rojo: el ingreso no se cae.
+5. `recuperacion`: todas las filas vuelven a verde.
+Derivación: Lambdas con `Errors`/`Invocations`/`Throttles` por minuto (sin invocaciones = OK). `ms-process-billing`: OFF con 0 pods o `HealthCheckOk`=0; DEGRADADO si los pods bajan respecto al minuto anterior o hay `MensajesReenviados`>0. Límite: no hay métrica de pods esperados, así que un escalado KEDA hacia abajo también se vería amarillo; métrica mínima propuesta: `PodsEsperados` (gauge) en `ms-process-billing`. Las anotaciones de fase sobre este panel están sin verificar en Grafana real.
+
+## 4. Lectura del tablero (orden: arriba-izquierda a abajo-derecha)
+
+| # | Panel | Eje X / eje Y | Patrón de arquitectura |
+|---|---|---|---|
+| 1 | **ms-process-billing: el ingreso, no se cae** (stat EN LINEA/CAIDO) | Un valor | Bulkhead / mensajería asíncrona |
+| 2 | **Servicio que se cae: errores por minuto** (stat) | Un valor, errores/min de `ms-comprobante-factura` y `ms-tarifas` | Bulkhead + Retry con backoff |
+| 3 | **Facturas emitidas por ms-facturacion** (stat) | Un valor | Bulkhead + Outbox |
+| 4 | **SALDO de conservación** (stat grande, verde en 0) | Un valor: inyectadas − (emitidas + rechazadas + DLQ) | DLQ + Idempotencia + Outbox |
+| T | **Estado de los servicios en el tiempo** (state timeline, 24 col.) | X: hora. Y: un servicio por fila (OK/DEGRADADO/OFF) | Bulkhead (aislamiento visible) |
+| A | **Emitidas vs notificadas (acumuladas)** | X: hora. Y: facturas acumuladas | Desacople por cola |
+| B | **DLQ: mensajes apartados por servicio** | X: hora. Y: mensajes en cola | Retry/backoff + DLQ |
+| C | **Pods de ms-process-billing y mensajes reenviados** | X: hora. Y izq.: reenvíos/min; Y der.: pods | At-least-once + réplicas |
+| D | **Duplicados descartados por idempotencia** | X: hora. Y: duplicados/min | Idempotencia |
+| E | **Errores de las Lambdas y de Step Functions** | X: hora. Y: errores/min | Retry + Catch → DLQ (Saga) |
+
+## 5. Veredicto (30 s)
+Aprobado si: (1) el stat 1 nunca marcó CAIDO, (2) el stat 3 siguió subiendo durante los fallos, (3) el SALDO terminó en 0 y verde, (4) el gráfico D solo se movió en la fase `duplicados` y las emitidas no se duplicaron, (5) el gráfico B terminó en 0 tras la recuperación. Caso b: con `maxReceiveCount` 3 y visibility timeout 180 s tarda ≥ 9 min en llegar a DLQ; usa el valor reducido (~40 s) de `experiment.tfvars.example`.
+
+## 6. Qué demuestra y qué no (30 s)
+- **Demuestra:** aislamiento de fallos, apartado en DLQ sin pérdida, reentrega tras la muerte de consumidores e idempotencia ante duplicados.
+- **No demuestra:** tolerancia a la pérdida de un broker (Kafka con 1 broker, replicación 1), comportamiento ante un tercero real, ni escala real. "EN LINEA" es la salud de `ms-process-billing`, no un endpoint de tiempo real. Hallazgo conocido: en una prueba un evento de estado se perdió y el ciclo quedó EN_CURSO; la reconciliación (`CiclosReconciliados`) está pensada para cerrarlo.
 
 ---
 

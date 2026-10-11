@@ -30,3 +30,14 @@ def test_agota_intentos_y_cuenta_el_fallo_en_best_effort():
     pub = DomainEventPublisher("t", b, attempts=3, retry_delay=0)
     assert pub.publish_event(_ev()) is False
     assert pub.failures == 1
+
+
+def test_fallo_inyectado_emite_senal(monkeypatch, capsys):
+    from voltera_common import maybe_fail
+    from voltera_common.faults import InjectedFault
+    import pytest
+    monkeypatch.setenv("FORCE_FAIL", "true")
+    monkeypatch.setenv("AWS_LAMBDA_FUNCTION_NAME", "voltera-exp2-ms-tarifas")
+    with pytest.raises(InjectedFault):
+        maybe_fail(label="x")
+    assert "FallaInyectada" in capsys.readouterr().out

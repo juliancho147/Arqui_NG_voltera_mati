@@ -262,3 +262,15 @@ variable "ecr_keep_images" {
   type    = number
   default = 5
 }
+
+variable "orchestrator_timeout_seconds" {
+  description = "Timeout de ms-orchestrator-billing: escribe N filas en el outbox (con N grande, 30 s no alcanzan)."
+  type        = number
+  default     = 300
+}
+
+variable "comprobante_timeout_seconds" {
+  description = "Timeout de ms-comprobante-factura (simula al tercero, ~1 s). Debe ser <= visibility timeout de su cola."
+  type        = number
+  default     = 30
+}

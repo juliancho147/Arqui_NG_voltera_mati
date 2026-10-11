@@ -103,7 +103,7 @@
         "filter": {
           "exclude": false,
           "ids": [
-            8
+            9
           ]
         },
         "target": {
@@ -138,7 +138,7 @@
       "id": 1,
       "type": "stat",
       "title": "Tiempo del lote en segundos (SLA: 120 s)",
-      "description": "Que mirar: verde = el lote termino dentro del SLA de 120 s; rojo = lo supero. Aparece 1-2 min despues de cerrar el ultimo lote (latencia de CloudWatch). Patron de arquitectura: SLA de cierre de ciclo; criterio de aceptacion del ASR de absorcion de picos.",
+      "description": "Qué mirar: verde = el lote termino dentro del SLA de 120 s; rojo = lo supero. Aparece 1-2 min despues de cerrar el ultimo lote (latencia de CloudWatch). Patrón de arquitectura: SLA de cierre de ciclo; criterio de aceptacion del ASR de absorcion de picos.",
       "datasource": {
         "type": "cloudwatch",
         "uid": "cloudwatch"
@@ -219,8 +219,8 @@
     {
       "id": 2,
       "type": "stat",
-      "title": "Replicas escaladas (pico)",
-      "description": "Que mirar: de 1 pod en reposo a 5 al llegar el pico (tope de KEDA). Patron de arquitectura: Autoescalado por evento (KEDA) sobre el lag del consumidor.",
+      "title": "Pods de ms-process-billing en el pico (escala KEDA)",
+      "description": "Qué mirar: de 1 pod en reposo a 5 al llegar el pico (tope de KEDA). Patrón de arquitectura: Autoescalado por evento (KEDA) sobre el lag del consumidor.",
       "datasource": {
         "type": "cloudwatch",
         "uid": "cloudwatch"
@@ -300,7 +300,7 @@
       "id": 3,
       "type": "stat",
       "title": "Mensajes pendientes al llegar el pico (maximo)",
-      "description": "Que mirar: tamano del pico que hubo que absorber; luego el grafico de abajo debe llevarlo a 0. Patron de arquitectura: Queue-Based Load Leveling: la cola (Kafka) absorbe lo que el consumo aun no procesa.",
+      "description": "Qué mirar: tamano del pico que hubo que absorber; luego el grafico de abajo debe llevarlo a 0. Patrón de arquitectura: Queue-Based Load Leveling: la cola (Kafka) absorbe lo que el consumo aun no procesa.",
       "datasource": {
         "type": "cloudwatch",
         "uid": "cloudwatch"
@@ -399,8 +399,8 @@
     {
       "id": 4,
       "type": "timeseries",
-      "title": "Pendientes por procesar (lag) y replicas que escalan  (eje X: hora)",
-      "description": "Que mirar: el lag sube de golpe al inyectar el lote y las replicas suben 1 -> 4 -> 5 unos 35 s despues; el lag cae a 0 y las replicas vuelven a 1. Lag = KafkaConsumerLag Sum/6 (6 muestras por minuto por pod; asume METRICS_FLUSH_SECONDS=10). Patron de arquitectura: Queue-Based Load Leveling + autoescalado por evento (KEDA, lagThreshold 2). Eje izq: mensajes; eje der: pods. Eje Y: Mensajes pendientes (lag). Eje X: tiempo (hora local).",
+      "title": "ms-process-billing: mensajes pendientes en Kafka y pods que escalan  (eje X: hora)",
+      "description": "Qué mirar: el lag sube de golpe al inyectar el lote y las replicas suben 1 -> 4 -> 5 unos 35 s despues; el lag cae a 0 y las replicas vuelven a 1. Lag = KafkaConsumerLag Sum/6 (6 muestras por minuto por pod; asume METRICS_FLUSH_SECONDS=10). Patrón de arquitectura: Queue-Based Load Leveling + autoescalado por evento (KEDA, lagThreshold 2). Eje izq: mensajes; eje der: pods. Eje Y: Mensajes pendientes (lag). Eje X: tiempo (hora local).",
       "datasource": {
         "type": "cloudwatch",
         "uid": "cloudwatch"
@@ -449,7 +449,7 @@
           "id": "",
           "period": "60",
           "region": "default",
-          "label": "mensajes pendientes (lag)",
+          "label": "Kafka: mensajes pendientes por procesar (lag)",
           "hide": false,
           "namespace": "",
           "metricName": "",
@@ -479,7 +479,7 @@
           "matchExact": true,
           "id": "",
           "expression": "",
-          "label": "replicas",
+          "label": "ms-process-billing: pods (replicas)",
           "hide": false
         }
       ],
@@ -504,7 +504,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "replicas"
+              "options": "ms-process-billing: pods (replicas)"
             },
             "properties": [
               {
@@ -513,7 +513,7 @@
               },
               {
                 "id": "custom.axisLabel",
-                "value": "Replicas (pods)"
+                "value": "Pods de ms-process-billing"
               },
               {
                 "id": "custom.fillOpacity",
@@ -553,7 +553,7 @@
       "id": 5,
       "type": "timeseries",
       "title": "Facturas emitidas acumuladas (el lote avanza)  (eje X: hora)",
-      "description": "Que mirar: la curva de emitidas sube hasta alcanzar la meta (inyectadas); el instante en que la alcanza es el tiempo del lote. Patron de arquitectura: Cero perdida por saturacion: todo lo inyectado termina emitido aunque llegue en rafaga. Eje Y: Facturas acumuladas. Eje X: tiempo (hora local).",
+      "description": "Qué mirar: la curva de emitidas sube hasta alcanzar la meta (inyectadas); el instante en que la alcanza es el tiempo del lote. Patrón de arquitectura: Cero perdida por saturacion: todo lo inyectado termina emitido aunque llegue en rafaga. Eje Y: Facturas acumuladas. Eje X: tiempo (hora local).",
       "datasource": {
         "type": "cloudwatch",
         "uid": "cloudwatch"
@@ -691,8 +691,8 @@
     {
       "id": 6,
       "type": "timeseries",
-      "title": "Tiempo por mensaje en segundos (total y sobrecosto)  (eje X: hora)",
-      "description": "Que mirar: el total debe rondar el retardo simulado (2 s); el sobrecosto (total - retardo) debe quedar bajo ~0,2 s. Si no, la demora esta en el escalado o el reparto de particiones, no en el servicio. Patron de arquitectura: Medicion del costo de la mensajeria durable (claim, SQS, commit) frente al trabajo util. Eje Y: Segundos por mensaje. Eje X: tiempo (hora local).",
+      "title": "Cuanto tarda ms-process-billing en procesar UNA factura (segundos)  (eje X: hora)",
+      "description": "Qué mirar: mide UNA factura dentro de un pod de ms-process-billing, desde que la lee de Kafka hasta que la confirma. La linea de arriba (~2 s) es casi toda la espera simulada que fija el experimento (--delay); la linea de abajo es lo que cuesta la mensajeria real (DynamoDB, SQS, commit) y debe ser menor a 0,2 s. Si la de abajo es chica, el servicio no es el cuello: la demora esta en el escalado o el reparto de particiones. Patrón de arquitectura: Medicion del costo de la mensajeria durable (claim, SQS, commit) frente al trabajo util. Eje Y: Segundos por factura. Eje X: tiempo (hora local).",
       "datasource": {
         "type": "cloudwatch",
         "uid": "cloudwatch"
@@ -778,29 +778,6 @@
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
-          "refId": "D",
-          "queryMode": "Metrics",
-          "metricQueryType": 0,
-          "metricEditorMode": 0,
-          "namespace": "Voltera/Exp2",
-          "metricName": "MensajeSobrecostoMs",
-          "dimensions": {
-            "service": "ms-process-billing"
-          },
-          "statistic": "Maximum",
-          "period": "60",
-          "region": "default",
-          "matchExact": true,
-          "id": "sm",
-          "expression": "",
-          "label": "sob_max",
-          "hide": true
-        },
-        {
-          "datasource": {
-            "type": "cloudwatch",
-            "uid": "cloudwatch"
-          },
           "refId": "E",
           "queryMode": "Metrics",
           "metricQueryType": 0,
@@ -809,7 +786,7 @@
           "id": "",
           "period": "60",
           "region": "default",
-          "label": "total promedio",
+          "label": "Tiempo total por factura (promedio)",
           "hide": false,
           "namespace": "",
           "metricName": "",
@@ -830,7 +807,7 @@
           "id": "",
           "period": "60",
           "region": "default",
-          "label": "total maximo",
+          "label": "Tiempo total de la factura mas lenta",
           "hide": false,
           "namespace": "",
           "metricName": "",
@@ -851,28 +828,7 @@
           "id": "",
           "period": "60",
           "region": "default",
-          "label": "sobrecosto promedio",
-          "hide": false,
-          "namespace": "",
-          "metricName": "",
-          "dimensions": {},
-          "statistic": "Average",
-          "matchExact": true
-        },
-        {
-          "datasource": {
-            "type": "cloudwatch",
-            "uid": "cloudwatch"
-          },
-          "refId": "H",
-          "queryMode": "Metrics",
-          "metricQueryType": 0,
-          "metricEditorMode": 1,
-          "expression": "sm/1000",
-          "id": "",
-          "period": "60",
-          "region": "default",
-          "label": "sobrecosto maximo",
+          "label": "Solo el trabajo de mensajeria (sin la espera simulada)",
           "hide": false,
           "namespace": "",
           "metricName": "",
@@ -885,7 +841,7 @@
         "defaults": {
           "unit": "s",
           "custom": {
-            "axisLabel": "Segundos por mensaje",
+            "axisLabel": "Segundos por factura",
             "drawStyle": "line",
             "lineWidth": 2,
             "fillOpacity": 8,
@@ -917,6 +873,78 @@
     },
     {
       "id": 7,
+      "type": "timeseries",
+      "title": "Lambdas que escalan: ejecuciones simultaneas por servicio  (eje X: hora)",
+      "description": "Qué mirar: cada linea es una Lambda del flujo (ms-tarifas, ms-calculo-consumo-neto, ms-facturacion, ms-comprobante-factura): sube cuando llegan facturas y baja a 0 al terminar. Lambda escala sola, sin KEDA. Patrón de arquitectura: Computo serverless por evento: escala por concurrencia, a diferencia de ms-process-billing que escala por lag con KEDA. Eje Y: Ejecuciones simultaneas de la Lambda. Eje X: tiempo (hora local).",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 25
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 1,
+          "expression": "SEARCH('{AWS/Lambda,FunctionName} MetricName=\"ConcurrentExecutions\" voltera-exp2', 'Maximum', 60)",
+          "id": "",
+          "period": "60",
+          "region": "default",
+          "label": "${PROP('Dim.FunctionName')}",
+          "hide": false,
+          "namespace": "",
+          "metricName": "",
+          "dimensions": {},
+          "statistic": "Average",
+          "matchExact": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "axisLabel": "Ejecuciones simultaneas de la Lambda",
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 8,
       "type": "row",
       "title": "Fuente de anotaciones (FaseExperimento; no se explica)",
       "collapsed": false,
@@ -924,12 +952,12 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 25
+        "y": 34
       },
       "panels": []
     },
     {
-      "id": 8,
+      "id": 9,
       "type": "table",
       "title": "Marca: Pico inyectado",
       "description": "CloudWatch Voltera/Exp2/FaseExperimento experimento=exp1 fase=disparo. Cada punto dibuja la anotacion 'Pico inyectado'.",
@@ -939,9 +967,9 @@
       },
       "gridPos": {
         "h": 3,
-        "w": 12,
+        "w": 8,
         "x": 0,
-        "y": 26
+        "y": 35
       },
       "targets": [
         {

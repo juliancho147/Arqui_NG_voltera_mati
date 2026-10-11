@@ -32,6 +32,8 @@ services:
       - ./dashboards:/var/lib/grafana/dashboards:ro
       - ${AWS_CREDENTIALS_FILE:-./aws/credentials}:/etc/grafana/aws/credentials:ro
       - grafana-data:/var/lib/grafana
+    tmpfs:
+      - /var/lib/grafana/dashboards/_legacy   # oculta los dashboards antiguos: el proveedor de archivos recorre subcarpetas
 
 volumes:
   grafana-data:

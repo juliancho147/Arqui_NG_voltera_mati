@@ -5,8 +5,10 @@ runner afecta de verdad al comportamiento simulado.
 """
 from __future__ import annotations
 
+import base64
 import json
 import math
+import re
 import time
 from decimal import Decimal
 
@@ -20,11 +22,11 @@ KEBAB = {"CicloDeFacturacionIniciado": "ciclo-de-facturacion-iniciado", "TarifaV
 
 class World:
     def __init__(self, ctx_factory, cfg, session, *, claim_every=2.0, proc_time=5.0, dlq_after=20.0, restart_time=10.0,
-                 drop_event: str | None = None, duplicate_invoice: bool = False):
+                 drop_event: str | None = None, duplicate_invoice: bool = False, reject_headers: bool = False):
         self.cfg, self.session = cfg, session
         self.t = 1000.0
         self.claim_every, self.proc_time, self.dlq_after, self.restart_time = claim_every, proc_time, dlq_after, restart_time
-        self.drop_event, self.duplicate_invoice = drop_event, duplicate_invoice
+        self.drop_event, self.duplicate_invoice, self.reject_headers = drop_event, duplicate_invoice, reject_headers
         self.f: dict[tuple[str, str], dict] = {}
         self.ddb = session.resource("dynamodb")
         self.sqs = session.client("sqs")
@@ -40,6 +42,11 @@ class World:
         self.kube = Kube(runner=self._kubectl)
         self.stepping = False
         self.total: dict[str, int] = {}
+        self.ingreso: list[dict] = []     # eventos ConsumoFacturablePreparado del topico de ingreso
+        self.replays = 0                  # replays de idempotencia (duplicados por SQS)
+        self.kafka_dups = 0               # duplicados descartados por process-billing (reproducidos por Kafka)
+        self.dup_log: list[str] = []
+        self.cw = session.client("cloudwatch")
 
     # --- reloj
     def clock(self) -> float:
@@ -71,6 +78,12 @@ class World:
               "time": time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime(self.t)), "datacontenttype": "application/json",
               "cicloid": ciclo, "facturaid": factura, "data": {"cicloId": ciclo, "facturaId": factura, **data}}
         self.events.append({"p": part, "o": off, "key": factura, "value": ev})
+
+    def _metric(self, name: str, service: str) -> None:
+        from datetime import datetime, timezone
+        self.cw.put_metric_data(Namespace="Voltera/Exp2", MetricData=[{
+            "MetricName": name, "Dimensions": [{"Name": "service", "Value": service}], "Value": 1.0, "Unit": "Count",
+            "Timestamp": datetime.fromtimestamp(self.t, tz=timezone.utc)}])
 
     def _put(self, table_key, item):
         self.ddb.Table(self.cfg.table(table_key)).put_item(Item=item)
@@ -109,6 +122,11 @@ class World:
                 idx = sum(1 for k in self.f if k[0] == it["cicloId"])
                 self.total[it["cicloId"]] = sum(1 for i in tx if i["cicloId"] == it["cicloId"])
                 self.f[key] = {"stage": "new", "t": self.t + idx * self.claim_every, "idx": idx, "ts": self.t}
+                part = idx % 3
+                self.ingreso.append({"p": part, "o": len([e for e in self.ingreso if e["p"] == part]), "key": it["facturaId"], "value": {
+                    "specversion": "1.0", "id": f"{it['cicloId']}|{it['facturaId']}|ingreso", "source": "/voltera/test",
+                    "type": "com.voltera.facturacion.consumo-facturable-preparado.v1", "subject": it["facturaId"],
+                    "cicloid": it["cicloId"], "facturaid": it["facturaId"], "data": {"cicloId": it["cicloId"], "facturaId": it["facturaId"]}}})
                 if idx == 0:
                     self._emit("CicloDeFacturacionIniciado", it["cicloId"], "CICLO", totalUnidades=self.total[it["cicloId"]])
         # redrive: mensajes que reaparecen en las colas de origen
@@ -121,7 +139,10 @@ class World:
                 for x in m:
                     b = json.loads(x["Body"])
                     st = self.f.get((b["cicloId"], b["facturaId"]))
-                    if st:
+                    if str(b.get("eventId", "")).startswith("dup-"):  # copia forzada: ms-facturacion responde con el registro guardado
+                        self.replays += 1
+                        self._metric("IdempotenciaReplays", "ms-facturacion")
+                    elif st:
                         st.update(stage=stage, t=self.t, since=self.t)
                     self.sqs.delete_message(QueueUrl=q["url"], ReceiptHandle=x["ReceiptHandle"])
         for (ciclo, fid), st in self.f.items():
@@ -200,6 +221,8 @@ class World:
             self.pod = f"ms-process-billing-new{self.pod_seq}"
             self.paused_until = self.t + self.restart_time
             return KubeResult(0, f'pod "{a[2]}" deleted')
+        if a[0] == "logs":
+            return KubeResult(0, "\n".join(self.dup_log) + ("\n" if self.dup_log else ""))
         if a[0] == "exec":
             cmd = " ".join(a)
             if "kafka-consumer-groups" in cmd:
@@ -212,9 +235,26 @@ class World:
                     off = int(a[a.index("--offset") + 1])
                     mx = int(a[a.index("--max-messages") + 1]) if "--max-messages" in a else 10**9
                     evs = [e for e in evs if e["p"] == p and e["o"] >= off][:mx]
+                if "--topic" in a and a[a.index("--topic") + 1] == self.cfg.topic_ingreso:
+                    evs = self.ingreso
                 lines = [f"Partition:{e['p']}\tOffset:{e['o']}\tcicloId:{e['value']['cicloid']},facturaId:{e['value']['facturaid']}\t{e['key']}\t{json.dumps(e['value'])}"
                          for e in evs]
                 return KubeResult(0, "\n".join(lines) + "\n")
+            if "kafka-console-producer" in cmd:
+                m = re.search(r"echo (\S+) \| base64 -d", cmd)
+                if "parse.headers=true" in cmd and self.reject_headers:
+                    return KubeResult(1, "", "Unrecognized option parse.headers")
+                pb = self.ddb.Table(self.cfg.table("process-billing"))
+                for line in base64.b64decode(m.group(1)).decode().splitlines():
+                    parts = line.split("\t")
+                    v = json.loads(parts[-1])
+                    it = pb.get_item(Key={"cicloId": v["cicloid"], "sk": f"DEDUP#{v['facturaid']}"}).get("Item")
+                    if it and it.get("estado") == "ENVIADO":
+                        self.kafka_dups += 1
+                        self.dup_log.append(f'[pod/{self.pod}/ms-process-billing] {{"message": "mensaje duplicado descartado", "cicloId": "{v["cicloid"]}", "facturaId": "{v["facturaid"]}"}}')
+                        self._metric("MensajesDuplicados", "ms-process-billing")
+                self.produced = getattr(self, "produced", 0) + len(base64.b64decode(m.group(1)).decode().splitlines())
+                return KubeResult(0, "")
             if "curl" in cmd:
                 return KubeResult(7, "", "curl: (7) no route")
         return KubeResult(1, "", f"comando no simulado: {args}")

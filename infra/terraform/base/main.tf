@@ -105,7 +105,7 @@ module "lambda_orchestrator" {
 
   function_name        = "${local.prefix}-ms-orchestrator-billing"
   source_dir           = "${local.services_dir}/ms-orchestrator-billing"
-  timeout              = local.lambda_common.runtime_timeout
+  timeout              = var.orchestrator_timeout_seconds
   memory_size          = local.lambda_common.memory_mb
   log_retention_days   = local.lambda_common.retention_days
   layers               = local.lambda_common.layers
@@ -267,7 +267,7 @@ module "lambda_comprobante" {
 
   function_name        = "${local.prefix}-ms-comprobante-factura"
   source_dir           = "${local.services_dir}/ms-comprobante-factura"
-  timeout              = local.lambda_common.runtime_timeout
+  timeout              = var.comprobante_timeout_seconds
   memory_size          = local.lambda_common.memory_mb
   log_retention_days   = local.lambda_common.retention_days
   layers               = local.lambda_common.layers

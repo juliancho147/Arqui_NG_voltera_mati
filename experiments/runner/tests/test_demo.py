@@ -77,65 +77,72 @@ def test_demo_exp1_phases_marks_metric_echo_and_resultados(demo_ctx, aws):
     assert (run_dir / "report.md").exists()
 
 
-def test_demo_exp2_case_b_default_restores_and_marks(demo_ctx):
-    ctx, w, inputs = demo_ctx()
+FASES_EXP2 = ["estado_inicial", "disparo", "fallo_dependiente", "fallo_pod", "fallo_lambda", "duplicados", "recuperacion", "veredicto"]
+OPTS = {"observe": 5, "fault_window": 10, "dupl": 6, "timeout_metricas": 30, "poll_metricas": 5, "settle": 5, "timeout_inflight": 60,
+        "fail_rate": 0.3, "kill_pods": 2}
+
+
+def test_demo_exp2_unificado_fases_marcas_metrica_y_restauracion(demo_ctx, aws):
+    ctx, w, inputs = demo_ctx(dict(OPTS), claim_every=4.0)
     out = []
-    rc = run_demo(ctx, "exp2", 4, "CD2", EXPS, pause=False, resultados=None, out=out.append)
-    fases, _, _ = phases(ctx)
-    assert rc == 0, "\n".join(out)
-    assert fases == ["estado_inicial", "fallo_inyectado", "disparo", "acumulacion", "recuperacion", "veredicto"]
-    assert inputs == [], "--no-pause no debe preguntar"
-    assert lam_env(ctx, "ms-comprobante-factura")["FORCE_FAIL"] == "false"
+    rc = run_demo(ctx, "exp2", 6, "CD2", EXPS, resultados=demo_ctx.resultados, out=out.append)
+    fases, run_dir, data = phases(ctx)
+    text = "\n".join(out)
+    assert rc == 0, text
+    assert fases == FASES_EXP2
+    assert len(inputs) == 8 and all("Enter para continuar" in p for p in inputs), "una pausa Enter por fase"
+    assert data["experimento"] == "exp2"
+    cw = aws[0].client("cloudwatch")
+    ms = cw.list_metrics(Namespace="Voltera/Exp2", MetricName="FaseExperimento")["Metrics"]
+    assert {d["Value"] for m in ms for d in m["Dimensions"] if d["Name"] == "fase"} == set(FASES_EXP2)
+    assert {d["Value"] for m in ms for d in m["Dimensions"] if d["Name"] == "experimento"} == {"exp2"}
+    assert w.deleted and w.replays == 6 and w.kafka_dups == 6
+    assert lam_env(ctx, "ms-comprobante-factura")["FORCE_FAIL"] == "false" and lam_env(ctx, "ms-facturacion")["FAIL_RATE"] == "0"
     assert ctx.journal.pending() == []
-    assert all(c.id.startswith("E2.B") for c in [])  # solo caso B
-    assert "aws lambda update-function-configuration" in "\n".join(out)
-    assert "Estado restaurado" in "\n".join(out)
+    assert "FASE 3 · FALLO: DEPENDIENTE CAIDO" in text and "FASE 6 · DUPLICADOS A PROPOSITO" in text and "Estado restaurado" in text
+    assert "aws lambda update-function-configuration" in text and "kafka-console-producer" in text and "aws sqs send-message-batch" in text
+    md = demo_ctx.resultados.read_text(encoding="utf-8")
+    assert "Prueba 2" in md and "| Instante | Fase |" in md and "Resiliencia ante fallos" in md
 
 
-def test_exp2_serie_dlq_acumulandose_y_drenando(make):
-    ctx, w = make({"case": "B"})
-    from runner.experiments.exp2 import Exp2
-    res = Exp2(ctx, 3, "C").run()
-    serie = res.data["serieB"]
-    assert serie and max(s["dlqComp"] for s in serie) >= 3 and serie[-1]["dlqComp"] == 0
-
-
-def test_demo_exp3_fail_rate_and_restore(demo_ctx):
-    ctx, w, inputs = demo_ctx({"fault_window": 10, "fail_rate": 0.3, "kill_pods": 2}, dlq_after=10**9)
+def test_demo_exp3_es_alias_de_exp2(demo_ctx):
+    ctx, w, inputs = demo_ctx(dict(OPTS), claim_every=4.0)
     out = []
-    rc = run_demo(ctx, "exp3", 6, "CD3", EXPS, pause=False, resultados=demo_ctx.resultados, out=out.append)
-    fases, _, _ = phases(ctx)
-    assert "fallo_pod" in fases and "fallo_lambda" in fases and fases[-1] == "veredicto"
-    assert w.deleted
-    assert lam_env(ctx, "ms-facturacion")["FAIL_RATE"] == "0" and lam_env(ctx, "ms-comprobante-factura")["FORCE_FAIL"] == "false"
-    assert ctx.journal.pending() == []
-    kinds = [e["kind"] for e in ctx.journal.all()]
-    assert kinds.count("lambda_env") == 2
-    assert rc == 0, "\n".join(out)
-    assert "Prueba 2" in demo_ctx.resultados.read_text(encoding="utf-8")
+    rc = run_demo(ctx, "exp3", 4, "CD3", EXPS, pause=False, resultados=None, out=out.append)
+    fases, _, data = phases(ctx)
+    assert rc == 0 and fases == FASES_EXP2 and data["experimento"] == "exp2"
+    assert "se unio al exp2" in "\n".join(out) and inputs == []
 
 
-def test_exp3_fail_rate_zero_skips_partial_fault(make):
-    from runner.experiments.exp3 import Exp3
-    ctx, w = make({"fault_window": 5, "fail_rate": 0}, dlq_after=10**9)
-    Exp3(ctx, 4, "C").run()
-    assert [e["target"].endswith("ms-comprobante-factura") for e in ctx.journal.all() if e["kind"] == "lambda_env"] == [True]
-
-
-def test_ctrl_c_during_fault_restores(demo_ctx):
-    ctx, w, inputs = demo_ctx()
+def test_ctrl_c_durante_el_fallo_restaura(demo_ctx):
+    ctx, w, inputs = demo_ctx(dict(OPTS), claim_every=4.0)
 
     def hook(prompt=""):
         inputs.append(prompt)
-        if len(inputs) == 4:  # fase 'acumulacion': el fallo esta activo
+        if len(inputs) == 5:  # fase 'fallo_lambda': dependiente caido y, tras la inyeccion, FAIL_RATE
             assert lam_env(ctx, "ms-comprobante-factura")["FORCE_FAIL"] == "true"
             raise KeyboardInterrupt
         return ""
     ctx.input_fn = hook
     out = []
-    rc = run_demo(ctx, "exp2", 3, "CD4", EXPS, resultados=None, out=out.append)
+    rc = run_demo(ctx, "exp2", 4, "CD4", EXPS, resultados=None, out=out.append)
     assert rc == 130
     assert lam_env(ctx, "ms-comprobante-factura")["FORCE_FAIL"] == "false"
+    assert ctx.journal.pending() == []
+
+
+def test_ctrl_c_con_fail_rate_activo_restaura(demo_ctx):
+    ctx, w, inputs = demo_ctx(dict(OPTS), claim_every=4.0)
+
+    def hook(prompt=""):
+        inputs.append(prompt)
+        if len(inputs) == 6:  # fase 'duplicados': tras la ventana de FAIL_RATE
+            raise KeyboardInterrupt
+        return ""
+    ctx.input_fn = hook
+    rc = run_demo(ctx, "exp2", 4, "CD5", EXPS, resultados=None, out=lambda s: None)
+    assert rc == 130
+    assert lam_env(ctx, "ms-comprobante-factura")["FORCE_FAIL"] == "false" and lam_env(ctx, "ms-facturacion")["FAIL_RATE"] == "0"
     assert ctx.journal.pending() == []
 
 
@@ -180,7 +187,7 @@ def test_grafana_disabled_without_credentials_and_posts_with_token(monkeypatch):
 def test_append_section_numbering_and_template_kept(tmp_path):
     f = tmp_path / "R.md"
     f.write_text(TEMPLATE, encoding="utf-8")
-    r = ExperimentResult("exp3", "Exp. 3", "h", started="a", finished="b", params={"N": 5, "cicloId": "C"})
+    r = ExperimentResult("exp2", "Exp. 2", "h", started="a", finished="b", params={"N": 5, "cicloId": "C"})
     r.add("E3.1", "algo", True, "x", "x")
     r.add("E3.2", "otro", False, "x", "y")
     assert append_section(r, tmp_path / "20261011-demo-exp3", f) == 2
@@ -218,8 +225,23 @@ def test_peek_queue_covers_large_random_sampling():
 
 
 def test_cli_demo_parser_and_dry_run(capsys):
-    a = cli.build_parser().parse_args(["demo", "exp3", "--n", "500", "--delay", "2", "--fail-rate", "0", "--kill-pods", "2", "--no-pause"])
-    assert a.exp == "exp3" and a.n == 500 and a.no_pause
-    assert cli._options(a)["fail_rate"] == 0 and cli._options(a)["kill_pods"] == 2
+    a = cli.build_parser().parse_args(["demo", "exp2", "--n", "500", "--delay", "2", "--fail-rate", "0", "--kill-pods", "2", "--dupl", "50", "--no-pause"])
+    assert a.exp == "exp2" and a.n == 500 and a.no_pause
+    o = cli._options(a)
+    assert o["fail_rate"] == 0 and o["kill_pods"] == 2 and o["dupl"] == 50
     assert cli.main(["demo", "exp2", "--dry-run", "--n", "500"]) == 0
-    assert "DRY-RUN demo" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "DRY-RUN demo" in out
+    for fase in ("estado_inicial", "disparo", "fallo_dependiente", "fallo_pod", "fallo_lambda", "duplicados", "recuperacion", "veredicto"):
+        assert f"[{fase}]" in out, fase
+
+
+def test_cli_exp3_alias_avisa_y_muestra_el_plan_de_exp2(capsys):
+    assert cli.main(["demo", "exp3", "--dry-run", "--n", "100"]) == 0
+    cap = capsys.readouterr()
+    assert "se unio al Exp. 2" in cap.err and "[duplicados]" in cap.out
+    assert cli.main(["exp3", "--dry-run", "--n", "100"]) == 0
+    cap = capsys.readouterr()
+    assert "se unio al Exp. 2" in cap.err and "Resiliencia ante fallos" in cap.out
+    assert cli.main(["all", "--dry-run", "--n", "10"]) == 0
+    assert "Exp. 3" not in capsys.readouterr().out

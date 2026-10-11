@@ -129,7 +129,7 @@ def test_cli_dry_run_never_touches_aws_or_kubectl(monkeypatch, capsys):
     monkeypatch.setattr("subprocess.run", lambda *a, **k: (_ for _ in ()).throw(AssertionError("subprocess")))
     assert cli.main(["all", "--dry-run", "--n", "4", "--ciclo-id", "T9"]) == 0
     out = capsys.readouterr().out
-    for e in ("Exp. 1", "Exp. 2", "Exp. 3", "Exp. 4"):
+    for e in ("Exp. 1", "Exp. 2", "Exp. 4"):
         assert e in out
     assert "T9-EXP1" in out and "FORCE_FAIL" in out and "kubectl delete pod" in out
 

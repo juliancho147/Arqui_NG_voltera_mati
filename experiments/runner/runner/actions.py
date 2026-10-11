@@ -159,8 +159,13 @@ def redrive_dlq(ctx: Context, queue_key: str, timeout: float = 120) -> dict:
             return mine[0] if mine and mine[0].get("Status") in ("COMPLETED", "FAILED", "CANCELLED") else None
 
         res, _ = ctx.wait_until(done, timeout, 3)
-        return {"mode": "StartMessageMoveTask", "movidosAntes": before, "status": (res or {}).get("Status", "TIMEOUT"),
-                "movidos": (res or {}).get("ApproximateNumberOfMessagesMoved")}
+        out = {"mode": "StartMessageMoveTask", "movidosAntes": before, "status": (res or {}).get("Status", "TIMEOUT"),
+               "movidos": (res or {}).get("ApproximateNumberOfMessagesMoved")}
+        if out["status"] == "COMPLETED" and (out["movidos"] or 0) > 0 or before == 0:
+            return out
+        # FAILED / 0 movidos con la DLQ llena: p. ej. mensajes que Step Functions escribio DIRECTO en la DLQ (SQS solo mueve los que
+        # el propio SQS envio a la DLQ por maxReceiveCount). Se hace el redrive manual.
+        ctx.log(f"StartMessageMoveTask no movio nada ({out['status']}, movidos={out['movidos']}); redrive manual")
     except (ClientError, NotImplementedError, AttributeError) as exc:
         ctx.log(f"StartMessageMoveTask no disponible ({exc}); redrive manual")
     moved = 0
@@ -174,3 +179,41 @@ def redrive_dlq(ctx: Context, queue_key: str, timeout: float = 120) -> dict:
             sqs.delete_message(QueueUrl=q["dlq_url"], ReceiptHandle=m["ReceiptHandle"])
             moved += 1
     return {"mode": "manual", "movidosAntes": before, "status": "COMPLETED", "movidos": moved}
+
+
+# ----------------------------------------------------------------------------- duplicados forzados
+def sqs_duplicate_bodies(ctx: Context, ciclo_id: str, factura_ids: list[str], total: int) -> list[dict]:
+    """Reconstruye el cuerpo que ms-process-billing publica en la cola de transacciones
+    ({cicloId,facturaId,clienteId,tipoTarifa,periodo,ordinal,totalUnidades,eventId}) a partir de la tabla `transacciones`.
+    El eventId lleva el prefijo `dup-` para distinguir la copia; la idempotencia de ms-facturacion es por facturaId."""
+    from boto3.dynamodb.conditions import Key
+    items, kw = [], {"KeyConditionExpression": Key("cicloId").eq(ciclo_id)}
+    table = ctx.table("transacciones")
+    while True:
+        r = table.query(**kw)
+        items += r.get("Items", [])
+        if "LastEvaluatedKey" not in r:
+            break
+        kw["ExclusiveStartKey"] = r["LastEvaluatedKey"]
+    by_id = {it["facturaId"]: (i + 1, it) for i, it in enumerate(sorted(items, key=lambda x: x["facturaId"]))}
+    out = []
+    for k, fid in enumerate(factura_ids):
+        ordinal, it = by_id.get(fid, (0, {}))
+        body = {"cicloId": ciclo_id, "facturaId": fid, "clienteId": it.get("clienteId"), "tipoTarifa": it.get("tipoTarifa"),
+                "periodo": it.get("periodo"), "ordinal": ordinal, "totalUnidades": total, "eventId": f"dup-{fid}-{k}"}
+        out.append({kk: v for kk, v in body.items() if v is not None})
+    return out
+
+
+def send_duplicates_sqs(ctx: Context, bodies: list[dict]) -> int:
+    """Reenvia copias de mensajes ya enviados a la cola de transacciones. Solo a la cola del prefijo del proyecto."""
+    q = ctx.cfg.queue("transacciones")
+    ctx.guard(arn_resource(q["arn"]), "cola de transacciones")
+    sqs, sent = ctx.client("sqs"), 0
+    for i in range(0, len(bodies), 10):
+        chunk = bodies[i:i + 10]
+        r = sqs.send_message_batch(QueueUrl=q["url"], Entries=[{"Id": str(j), "MessageBody": json.dumps(b)} for j, b in enumerate(chunk)])
+        sent += len(r.get("Successful", []))
+        if r.get("Failed"):
+            ctx.log(f"aviso: {len(r['Failed'])} duplicados SQS no se enviaron: {r['Failed'][:1]}")
+    return sent

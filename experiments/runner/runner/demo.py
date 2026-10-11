@@ -1,6 +1,6 @@
-"""Modo demo (`python -m runner demo exp1|exp2|exp3`): un experimento por vez, pensado para grabarse en pantalla con Grafana en vivo.
+"""Modo demo (`python -m runner demo exp1|exp2`; exp3 es alias de exp2): un experimento por vez, pensado para grabarse en pantalla con Grafana en vivo.
 
-* Banner por fase (estado inicial, disparo, fallo inyectado, acumulacion, recuperacion, veredicto) con la hora y pausa
+* Banner por fase (Exp. 2: estado_inicial, disparo, fallo_dependiente, fallo_pod, fallo_lambda, duplicados, recuperacion, veredicto) con la hora y pausa
   interactiva ("Enter para continuar") antes de cada una.
 * Imprime cada comando AWS/kubectl relevante antes de ejecutarlo (las lecturas repetitivas se muestran una sola vez).
 * Marca cada fase: archivo `reports/<run>/marcas.json`, metrica CloudWatch `FaseExperimento` (namespace Voltera/Exp2,
@@ -28,11 +28,13 @@ from .safety import Aborted, SafetyError
 
 METRIC_NAMESPACE = "Voltera/Exp2"
 METRIC_NAME = "FaseExperimento"
-DASHBOARD_UID = {"exp1": "voltera-exp1-absorcion", "exp2": "voltera-exp2-aislamiento", "exp3": "voltera-exp3-cero-perdida"}
+ALIASES = {"exp3": "exp2"}   # el antiguo Exp. 3 (cero perdida) se unio al Exp. 2
+# exp2 usa una sola vista de Grafana (uid del antiguo dashboard de aislamiento; observability/ debe unificar el contenido).
+DASHBOARD_UID = {"exp1": "voltera-exp1-absorcion", "exp2": "voltera-exp2-resiliencia"}
 PHASE_TITLES = {
-    "estado_inicial": "ESTADO INICIAL", "disparo": "DISPARO", "fallo_inyectado": "FALLO INYECTADO", "acumulacion": "ACUMULACION / OBSERVACION",
-    "absorcion": "ABSORCION DEL PICO", "fallo_pod": "FALLO: MUERTE DE PODS", "fallo_lambda": "FALLO: LAMBDAS", "recuperacion": "RECUPERACION",
-    "veredicto": "VEREDICTO",
+    "estado_inicial": "ESTADO INICIAL", "disparo": "DISPARO", "fallo_dependiente": "FALLO: DEPENDIENTE CAIDO", "absorcion": "ABSORCION DEL PICO",
+    "fallo_pod": "FALLO: MUERTE DE PODS", "fallo_lambda": "FALLO: LAMBDA (FAIL_RATE)", "duplicados": "DUPLICADOS A PROPOSITO",
+    "recuperacion": "RECUPERACION", "veredicto": "VEREDICTO",
 }
 WIDTH = 78
 
@@ -158,7 +160,7 @@ def results_table(res: ExperimentResult) -> str:
 
 def apply_demo_defaults(ctx: Context, exp_name: str) -> None:
     o = ctx.options
-    if o.get("delay") is None and exp_name in ("exp1", "exp3"):
+    if o.get("delay") is None and exp_name in ("exp1", "exp2"):
         o["delay"] = 2.0
     if exp_name == "exp1" and o.get("sla") is None:
         o["sla_scale"] = True   # SLA proporcional a N (ver Exp1.sla)
@@ -169,6 +171,9 @@ def apply_demo_defaults(ctx: Context, exp_name: str) -> None:
 def run_demo(ctx: Context, exp_name: str, n: int, ciclo: str, experiments: dict, *, pause: bool = True, grafana: Grafana | None = None,
              resultados: Path | str | None = RESULTADOS_PATH, out: Callable[[str], None] | None = None) -> int:
     out = out or (lambda s: print(s, flush=True))
+    if exp_name in ALIASES:
+        out(f"AVISO: {exp_name} se unio al {ALIASES[exp_name]} (Resiliencia ante fallos: aislamiento + cero perdida); se ejecuta {ALIASES[exp_name]}.")
+        exp_name = ALIASES[exp_name]
     apply_demo_defaults(ctx, exp_name)
     stamp = time.strftime("%Y%m%d-%H%M%S")
     run_dir = Path(ctx.reports_dir) / f"{stamp}-demo-{exp_name}"

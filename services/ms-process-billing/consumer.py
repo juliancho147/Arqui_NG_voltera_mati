@@ -11,6 +11,26 @@ from typing import Callable
 log = logging.getLogger("process-billing.consumer")
 
 
+# Errores de commit que son NORMALES durante un rebalance (otro miembro entro o salio del grupo): el offset no se confirma y el
+# mensaje se reentrega; la deduplicacion en DynamoDB lo descarta. NO deben matar el hilo consumidor (y con el, el pod).
+_COMMIT_RECUPERABLE = ("ILLEGAL_GENERATION", "UNKNOWN_MEMBER_ID", "REBALANCE_IN_PROGRESS", "ASSIGNMENT_LOST", "_NO_OFFSET", "FENCED_INSTANCE_ID")
+
+
+def commit_seguro(consumer, **kwargs) -> bool:
+    """commit sincrono; True si confirmo, False si fallo por un rebalance (recuperable). Otros errores se propagan."""
+    try:
+        consumer.commit(asynchronous=False, **kwargs)
+        return True
+    except Exception as exc:  # noqa: BLE001 - KafkaException (confluent_kafka) no se importa aqui para no exigir la lib en tests
+        err = exc.args[0] if getattr(exc, "args", None) else None
+        name = err.name() if hasattr(err, "name") and callable(err.name) else ""
+        texto = f"{name} {exc}"
+        if any(c in texto for c in _COMMIT_RECUPERABLE):
+            log.warning("commit omitido por rebalance (%s); el mensaje se reentrega y se deduplica", name or exc)
+            return False
+        raise
+
+
 class PoisonMessage(Exception):
     """Mensaje no procesable (invalido): se registra y se omite (commit) para no bloquear la particion."""
 
@@ -61,7 +81,7 @@ def run_consumer(consumer, handler, stop: threading.Event, poll_timeout: float =
             handle_ms = (perf_counter() - t1) * 1000
             if done:
                 t2 = perf_counter()
-                consumer.commit(message=msg, asynchronous=False)
+                commit_seguro(consumer, message=msg)
                 commit_ms = (perf_counter() - t2) * 1000
                 if on_done:
                     try:
@@ -152,7 +172,7 @@ class ConcurrentCommitter:
                     to_commit.append(_topic_partition(tp[0], tp[1], last + 1))
                     self.committed[tp] = last
         if to_commit:
-            self.consumer.commit(offsets=to_commit, asynchronous=False)
+            commit_seguro(self.consumer, offsets=to_commit)
 
     def drain(self) -> None:
         """Espera a que termine todo lo en vuelo y confirma lo contiguo (apagado limpio / rebalance)."""
