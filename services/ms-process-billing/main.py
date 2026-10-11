@@ -9,7 +9,7 @@ import boto3
 from aws_lambda_powertools import Logger
 
 from config import Settings
-from consumer import run_consumer
+from consumer import ConcurrentCommitter, run_consumer, run_consumer_concurrent
 from health import make_server, serve_in_thread
 from ingest import IngestProcessor
 from state import CycleState
@@ -22,7 +22,7 @@ from voltera_common import DomainEventPublisher, KafkaBackend, aggregator_from_e
 logger = Logger(service="ms-process-billing")
 
 
-def build_consumer(settings: Settings, group: str, topic: str):
+def build_consumer(settings: Settings, group: str, topic: str, revoke_hook=None):
     from confluent_kafka import Consumer
 
     c = Consumer({
@@ -38,6 +38,8 @@ def build_consumer(settings: Settings, group: str, topic: str):
         log_json("INFO", "particiones asignadas", settings.service, grupo=group, particiones=[p.partition for p in parts])
 
     def on_revoke(cons, parts):
+        if revoke_hook is not None:
+            revoke_hook(parts)  # concurrencia>1: termina lo en vuelo y confirma lo contiguo antes de ceder
         log_json("INFO", "particiones revocadas", settings.service, grupo=group, particiones=[p.partition for p in parts])
 
     c.subscribe([topic], on_assign=on_assign, on_revoke=on_revoke)
@@ -57,15 +59,27 @@ def main() -> None:
     state = CycleState(s, table, publisher, logger=logger, metrics=metrics)
 
     pod = os.environ.get("HOSTNAME", "local")
-    ingreso_consumer = build_consumer(s, s.consumer_group, s.topic_ingreso)
+    conc = s.consumer_concurrency
+    holder: dict = {}
+    ingreso_consumer = build_consumer(s, s.consumer_group, s.topic_ingreso,
+                                      revoke_hook=(lambda parts: holder["cc"].on_revoke(parts)) if conc > 1 else None)
     lag_hook = lag_reporter(ingreso_consumer, metrics, s.service, s.topic_ingreso, pod)
 
     def on_done(poll_ms: float, handle_ms: float, commit_ms: float) -> None:
         report_timing(ingest, metrics, logger, poll_ms, handle_ms, commit_ms)
 
+    if conc > 1:
+        holder["cc"] = ConcurrentCommitter(ingreso_consumer, ingest.handle, stop, conc, on_done=on_done)
+        log_json("INFO", "concurrencia por pod activada", s.service, concurrencia=conc)
+        ingreso_thread = threading.Thread(target=run_consumer_concurrent, name="ingreso", args=(ingreso_consumer, ingest.handle, stop, conc, s.poll_timeout),
+                                          kwargs={"on_done": on_done, "committer": holder["cc"]})
+    else:
+        ingreso_thread = threading.Thread(target=run_consumer, name="ingreso", args=(ingreso_consumer, ingest.handle, stop, s.poll_timeout),
+                                          kwargs={"on_done": on_done})
+    if s.table_reconciliacion:
+        state.recon_table = boto3.resource("dynamodb", config=cfg).Table(s.table_reconciliacion)
     threads = [
-        threading.Thread(target=run_consumer, name="ingreso", args=(ingreso_consumer, ingest.handle, stop, s.poll_timeout),
-                         kwargs={"on_done": on_done}),
+        ingreso_thread,
         threading.Thread(target=run_consumer, name="estado", args=(build_consumer(s, s.group_eventos, s.topic_eventos), state.handle, stop, s.poll_timeout, state.sweep_timeouts)),
     ]
 

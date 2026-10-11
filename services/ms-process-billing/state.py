@@ -6,6 +6,7 @@ Items en la tabla process-billing (PK cicloId, SK sk):
 """
 from __future__ import annotations
 
+import json
 import time
 import uuid
 
@@ -26,10 +27,13 @@ def _is_cancelled(exc: ClientError) -> bool:
 
 
 class CycleState:
-    def __init__(self, settings: Settings, table, publisher: DomainEventPublisher, clock=time.time, logger=None, metrics=None):
+    def __init__(self, settings: Settings, table, publisher: DomainEventPublisher, clock=time.time, logger=None, metrics=None, recon_table=None):
         self.s, self.table, self.pub, self.clock, self.logger = settings, table, publisher, clock, logger
         self.metrics = metrics
         self.known: set[str] = set()
+        self.recon_table = recon_table  # idem-comprobante (solo lectura); None = sin reconciliacion
+        self._progress: dict[str, tuple[int, float]] = {}  # ciclo -> (terminales vistos, instante del ultimo avance)
+        self._last_recon: dict[str, float] = {}
 
     def _m(self, name: str, value: float = 1, unit: str = "Count") -> None:
         if self.metrics is not None:
@@ -73,7 +77,8 @@ class CycleState:
                                        ":ttl": int(self.clock()) + self.s.dedup_ttl_seconds},
         )
 
-    def _terminal(self, ciclo: str, factura: str, estado: str) -> None:
+    def _terminal(self, ciclo: str, factura: str, estado: str) -> bool:
+        """True si esta llamada registro el terminal (False = ya existia)."""
         fact_key = {"cicloId": ciclo, "sk": f"FACT#{factura}"}
         client = self.table.meta.client
         try:
@@ -84,7 +89,7 @@ class CycleState:
                             "UpdateExpression": f"ADD {COUNTER[estado]} :uno",
                             "ExpressionAttributeValues": {":uno": 1}}},
             ])
-            return
+            return True
         except ClientError as exc:
             if not _is_cancelled(exc):
                 raise
@@ -101,6 +106,77 @@ class CycleState:
             except ClientError as exc:
                 if not _is_cancelled(exc):
                     raise
+        return False
+
+    # ---- reconciliacion
+    def _query_sks(self, ciclo: str, prefix: str, only_enviado: bool = False) -> set[str]:
+        out: set[str] = set()
+        kw = {"KeyConditionExpression": "cicloId = :c AND begins_with(sk, :p)",
+              "ExpressionAttributeValues": {":c": ciclo, ":p": prefix}, "ProjectionExpression": "sk, estado", "ConsistentRead": True}
+        while True:
+            r = self.table.query(**kw)
+            for it in r.get("Items", []):
+                if not only_enviado or it.get("estado") == "ENVIADO":
+                    out.add(it["sk"][len(prefix):])
+            if "LastEvaluatedKey" not in r:
+                return out
+            kw["ExclusiveStartKey"] = r["LastEvaluatedKey"]
+
+    def _notificadas(self, candidatas: set[str]) -> set[str]:
+        """Facturas de `candidatas` con registro COMPLETED y estado NOTIFICADA en idem-comprobante (Scan: la PK es el hash de Powertools)."""
+        found: set[str] = set()
+        kw = {"ProjectionExpression": "#d, #s", "ExpressionAttributeNames": {"#d": "data", "#s": "status"}}
+        while True:
+            r = self.recon_table.scan(**kw)
+            for it in r.get("Items", []):
+                if it.get("status") != "COMPLETED":
+                    continue
+                try:
+                    d = json.loads(it.get("data") or "{}")
+                except ValueError:
+                    continue
+                if isinstance(d, dict) and d.get("estado") == "NOTIFICADA" and d.get("facturaId") in candidatas:
+                    found.add(d["facturaId"])
+            if "LastEvaluatedKey" not in r:
+                return found
+            kw["ExclusiveStartKey"] = r["LastEvaluatedKey"]
+
+    def reconcile(self, ciclo: str, meta: dict | None = None) -> int:
+        """Si el ciclo esta estancado y todas sus facturas fueron ENVIADAS a SQS, registra como OK las que el comprobante
+        ya notifico pero cuyo evento FacturaNotificada se perdio. Idempotente (_terminal es condicional) y seguro entre replicas."""
+        if self.recon_table is None:
+            return 0
+        meta = meta or self.table.get_item(Key=self._meta_key(ciclo), ConsistentRead=True).get("Item")
+        if not meta or meta.get("estado") != "EN_CURSO" or "totalUnidades" not in meta or "iniciadoEn" not in meta:
+            return 0
+        total = int(meta["totalUnidades"])
+        done = sum(int(meta.get(k, 0)) for k in ("emitidas", "rechazadas", "fallidas"))
+        now = self.clock()
+        seen, since = self._progress.get(ciclo, (-1, now))
+        if done != seen:
+            self._progress[ciclo] = (done, now)
+            return 0
+        after = self.s.reconcile_after_seconds
+        if done >= total or now - since < after or now - float(meta["iniciadoEn"]) < after:
+            return 0
+        if now - self._last_recon.get(ciclo, 0.0) < after:
+            return 0
+        self._last_recon[ciclo] = now
+        enviadas = self._query_sks(ciclo, "DEDUP#", only_enviado=True)
+        if len(enviadas) != total:
+            return 0  # aun hay facturas sin enviar a SQS: no es una perdida de evento de estado
+        faltantes = enviadas - self._query_sks(ciclo, "FACT#")
+        aplicadas = 0
+        for factura in sorted(self._notificadas(faltantes)):
+            if self._terminal(ciclo, factura, "OK"):
+                aplicadas += 1
+                self._m("FacturasReconciliadas")
+                self._log("factura reconciliada", cicloId=ciclo, facturaId=factura)
+        if aplicadas:
+            self._m("CiclosReconciliados")
+            self._log("ciclo reconciliado", cicloId=ciclo, facturasReconciliadas=aplicadas, faltantes=len(faltantes))
+            self.evaluate(ciclo)
+        return aplicadas
 
     # ---- evaluacion
     def evaluate(self, ciclo: str) -> str | None:
@@ -144,6 +220,11 @@ class CycleState:
             meta = self.table.get_item(Key=self._meta_key(ciclo), ConsistentRead=True).get("Item")
             if not meta or meta.get("estado") != "EN_CURSO" or "iniciadoEn" not in meta:
                 continue
+            try:
+                if self.reconcile(ciclo, meta):
+                    continue
+            except Exception as exc:  # la reconciliacion es best-effort: nunca debe impedir el barrido por timeout
+                self._log("fallo la reconciliacion", cicloId=ciclo, error=str(exc))
             if self.clock() - float(meta["iniciadoEn"]) < self.s.ciclo_timeout_seconds:
                 continue
             counters = {k: int(meta.get(k, 0)) for k in ("emitidas", "rechazadas", "fallidas")}

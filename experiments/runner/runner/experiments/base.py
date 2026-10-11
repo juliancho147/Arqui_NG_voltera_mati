@@ -29,6 +29,10 @@ class Experiment:
         raise NotImplementedError
 
     # --- comun
+    def scale_time(self, base: float, per_msg: float = 2.0, free: int = 10) -> float:
+        """Tiempo maximo proporcional a N: `base` mas `per_msg` s por cada mensaje por encima de `free` (10 = escala del plan)."""
+        return base + max(0, self.n - free) * float(self.ctx.opt("time_per_msg", per_msg))
+
     def run(self) -> ExperimentResult:
         r = ExperimentResult(self.name, self.title, self.hypothesis, started=now_iso(),
                              params={"N": self.n, "cicloId": self.ciclo_id, "region": self.cfg.region, "prefijo": self.cfg.prefix})
@@ -36,6 +40,7 @@ class Experiment:
             self.ctx.confirm(self.mutations())
         try:
             self.execute(r)
+            self.ctx.phase("veredicto", "Contabilidad final y criterios PASS/FAIL")
         except Exception as exc:  # noqa: BLE001 - el reporte debe generarse siempre
             r.error = f"{type(exc).__name__}: {exc}\n{traceback.format_exc(limit=6)}"
             self.ctx.log(f"ERROR en {self.name}: {exc}")

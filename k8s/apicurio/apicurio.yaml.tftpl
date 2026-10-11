@@ -25,6 +25,11 @@ spec:
             - name: http
               containerPort: 8080
           env:
+            # Container Insights inyecta OTEL_PROPAGATORS=xray, que Apicurio (Quarkus) no reconoce y no arranca.
+            - name: QUARKUS_OTEL_SDK_DISABLED
+              value: "true"
+            - name: OTEL_PROPAGATORS
+              value: "tracecontext"
             - name: JAVA_OPTS_APPEND
               value: "-Xms128m -Xmx384m"
             - name: APICURIO_STORAGE_KIND

@@ -10,8 +10,9 @@ locals {
 
   base = try(data.terraform_remote_state.base[0].outputs, {})
 
-  process_billing_table_arn = try(coalesce(var.base_overrides.process_billing_table_arn, try(local.base.dynamodb_tables.arns["process-billing"], null)), null)
-  transactions_queue_arn    = try(coalesce(var.base_overrides.transactions_queue_arn, try(local.base.sqs.transacciones.arn, null)), null)
+  process_billing_table_arn  = try(coalesce(var.base_overrides.process_billing_table_arn, try(local.base.dynamodb_tables.arns["process-billing"], null)), null)
+  idem_comprobante_table_arn = try(coalesce(var.base_overrides.idem_comprobante_table_arn, try(local.base.dynamodb_tables.arns["idem-comprobante"], null)), null)
+  transactions_queue_arn     = try(coalesce(var.base_overrides.transactions_queue_arn, try(local.base.sqs.transacciones.arn, null)), null)
 }
 
 data "aws_availability_zones" "available" {
@@ -36,7 +37,7 @@ data "terraform_remote_state" "base" {
 resource "terraform_data" "base_inputs" {
   lifecycle {
     precondition {
-      condition     = local.process_billing_table_arn != null && local.transactions_queue_arn != null
+      condition     = local.process_billing_table_arn != null && local.transactions_queue_arn != null && local.idem_comprobante_table_arn != null
       error_message = "Faltan ARNs del stack base. Aplica base primero (y revisa base_state_path) o pasa base_overrides."
     }
   }

@@ -114,6 +114,9 @@ data "kubectl_file_documents" "process_billing" {
     metrics_backend         = var.metrics_backend
     cloudwatch_namespace    = var.cloudwatch_namespace
     metrics_flush_seconds   = var.metrics_flush_seconds
+    table_reconciliacion    = coalesce(local.idem_comprobante_table, "")
+    reconcile_after_seconds = var.reconcile_after_seconds
+    consumer_concurrency    = var.consumer_concurrency
   })
 }
 

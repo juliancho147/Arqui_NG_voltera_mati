@@ -23,10 +23,20 @@ class Exp3(Experiment):
     def delay(self) -> float:
         return float(self.ctx.opt("delay", self.cfg.param("simulated_delay_seconds", 5)))
 
+    @property
+    def fail_rate(self) -> float:
+        return float(self.ctx.opt("fail_rate", 0.25))
+
+    @property
+    def kill_pods(self) -> int:
+        return max(1, int(self.ctx.opt("kill_pods", 1)))
+
     def mutations(self) -> list[str]:
         c = self.cfg
         return [
-            f"kubectl delete pod de {c.deployment} en el namespace {c.app_namespace} "
+            f"Inyectar FAIL_RATE={self.fail_rate} en {c.lambda_name('ms-facturacion')} (fallo parcial durante el pico) y restaurarlo (finally)" if self.fail_rate > 0 else
+            "Sin fallo parcial (--fail-rate 0)",
+            f"kubectl delete pod ({self.kill_pods}) de {c.deployment} en el namespace {c.app_namespace} "
             f"({'--grace-period=0 --force' if not self.ctx.opt('graceful', False) else 'apagado ordenado'}) con mensajes en vuelo",
             f"Inyectar FORCE_FAIL=true en {c.lambda_name('ms-comprobante-factura')} a mitad del lote y restaurarlo (finally)",
             f"Seed de {self.n} transacciones y PutEvents CierreDeMes (ciclo {self.ciclo_id})",
@@ -37,10 +47,10 @@ class Exp3(Experiment):
         return [
             f"Seed de {self.n} transacciones (ciclo {self.ciclo_id}, retardoSegundos={self.delay}) + PutEvents CierreDeMes en {c.bus_name}",
             f"Esperar a que haya DEDUP# en PROCESANDO en {c.table('process-billing')} (mensajes en vuelo) y guardar la lista",
-            f"kubectl delete pod -n {c.app_namespace} -l {self._selector()} (un pod; registrado en la bitacora)",
+            f"kubectl delete pod -n {c.app_namespace} -l {self._selector()} ({self.kill_pods} pod(s); registrado en la bitacora)",
             "Esperar el pod de reemplazo (deployment listo) y verificar que los mensajes en vuelo se reentregan (DEDUP# -> ENVIADO)",
-            f"Cuando haya >= {max(1, self.n // 2)} facturas emitidas: inyectar FORCE_FAIL en {c.lambda_name('ms-comprobante-factura')}, "
-            f"mantener {int(self.ctx.opt('fault_window', 40))} s y restaurar (finally)",
+            f"Cuando haya >= {max(1, self.n // 2)} facturas emitidas: inyectar FAIL_RATE={self.fail_rate} en {c.lambda_name('ms-facturacion')} "
+            f"y FORCE_FAIL en {c.lambda_name('ms-comprobante-factura')}, mantener {int(self.ctx.opt('fault_window', 40))} s y restaurar (finally)",
             f"Esperar la convergencia (reentrega SQS: hasta {mr} x visibilityTimeout) y contabilizar",
             "Ecuacion: inyectadas = emitidas + rechazadas + mensajes en DLQ (sin faltantes ni ajenos)",
             "Duplicados: un registro de idempotencia COMPLETED por facturaId, numeroFactura unico, DEDUP# == N, eventos FacturaEmitida repetidos (Kafka, si accesible)",
@@ -52,8 +62,10 @@ class Exp3(Experiment):
         poll = ctx.opt("poll", 5)
         mr = int(c.param("max_receive_count", 3))
         journal_ids: list[str] = []
-        r.params.update({"retardoSegundos": self.delay})
+        r.params.update({"retardoSegundos": self.delay, "failRate": self.fail_rate, "podsMatados": self.kill_pods})
         try:
+            ctx.phase("estado_inicial", f"Sistema sano: {c.deployment} en linea, colas y DLQ en 0")
+            ctx.phase("disparo", f"{n} transacciones entran por el cierre de mes (retardo {self.delay} s/mensaje) y habra mensajes en vuelo")
             d = actions.dispatch_cierre(ctx, self.ciclo_id, n, retardo_segundos=self.delay)
             ids = d["facturaIds"]
 
@@ -62,35 +74,41 @@ class Exp3(Experiment):
                 return [f for f, e in evidence.dedup_states(ctx, self.ciclo_id).items() if e == "PROCESANDO"]
             en_vuelo, _ = ctx.wait_until(in_flight, float(ctx.opt("timeout_inflight", 180)), poll)
             en_vuelo = in_flight()
+            ctx.phase("fallo_pod", f"Se matan {self.kill_pods} pod(s) de {c.deployment} con mensajes en vuelo ({len(en_vuelo)} PROCESANDO)")
             pods = ctx.kube.pods(c.app_namespace, self._selector())
-            killed = None
-            if pods:
-                victim = pods[0]["name"]
+            killed: list[str] = []
+            for pod in pods[:self.kill_pods]:
+                victim = pod["name"]
                 if not victim.startswith(c.deployment):
                     raise RuntimeError(f"pod '{victim}' no pertenece a {c.deployment}")
                 ctx.journal.record("pod_delete", f"{c.app_namespace}/{victim}", {"pod": victim, "enVuelo": en_vuelo}, revertible=False)
                 ctx.log(f"KILL pod {victim}; mensajes en vuelo: {len(en_vuelo)}")
                 ctx.kube.delete_pod(c.app_namespace, victim, force=not ctx.opt("graceful", False))
-                killed = victim
+                killed.append(victim)
 
             def replaced():
                 cur = ctx.kube.pods(c.app_namespace, self._selector())
                 st = ctx.kube.deployment_status(c.app_namespace, c.deployment)
-                return [p for p in cur if p["name"] != killed and p["ready"]] and st["ready"] >= 1
+                return [p for p in cur if p["name"] not in killed and p["ready"]] and st["ready"] >= 1
             rep_ok, rep_s = ctx.wait_until(replaced, float(ctx.opt("timeout_pod", 240)), poll)
-            r.add("E3.1", "El pod de process-billing muerto es reemplazado y vuelve a estar listo", bool(killed) and bool(rep_ok),
-                  "pod nuevo listo", f"muerto={killed}, reemplazo listo en {rep_s:.0f} s" if rep_ok else f"muerto={killed}, sin reemplazo",
+            r.add("E3.1", "Los pods de process-billing muertos son reemplazados y vuelven a estar listos", bool(killed) and bool(rep_ok),
+                  "pod(s) nuevo(s) listo(s)", f"muertos={killed}, reemplazo listo en {rep_s:.0f} s" if rep_ok else f"muertos={killed}, sin reemplazo",
                   mensajesEnVuelo=fmt_ids(en_vuelo))
 
-            # 2) fallo del comprobante a mitad del lote
+            # 2) fallos de Lambdas a mitad del lote: parcial (FAIL_RATE) en facturacion + caida del comprobante
             mitad = max(1, n // 2)
-            ctx.wait_until(lambda: len(evidence.facturas_emitidas(ctx, self.ciclo_id)) >= mitad, float(ctx.opt("timeout_mid", 240)), poll)
+            ctx.wait_until(lambda: len(evidence.facturas_emitidas(ctx, self.ciclo_id)) >= mitad, float(ctx.opt("timeout_mid", self.scale_time(240))), poll)
+            ctx.phase("fallo_lambda", f"Durante el pico: FAIL_RATE={self.fail_rate} en ms-facturacion (reintentos + idempotencia) y "
+                                      f"ms-comprobante-factura caido {int(ctx.opt('fault_window', 40))} s")
+            if self.fail_rate > 0:
+                journal_ids.append(actions.inject_fault(ctx, "ms-facturacion", "rate", rate=self.fail_rate))
             journal_ids.append(actions.inject_fault(ctx, "ms-comprobante-factura", ctx.opt("fault_mode", "env")))
             ctx.sleep(float(ctx.opt("fault_window", 40)))
+            ctx.phase("recuperacion", "Se restauran las Lambdas; los mensajes no confirmados se reentregan y todo converge")
         finally:
             restored = actions.restore_ids(ctx, journal_ids)
         pend = [e for e in ctx.journal.pending() if e["id"] in journal_ids]
-        r.add("E3.2", "ms-comprobante-factura restaurado tras el fallo a mitad del lote", not pend, "sin pendientes en bitacora",
+        r.add("E3.2", "Lambdas (ms-comprobante-factura y ms-facturacion) restauradas tras el fallo a mitad del lote", not pend, "sin pendientes en bitacora",
               f"{len(pend)} pendientes", restauracion=restored)
 
         # 3) convergencia
@@ -99,7 +117,7 @@ class Exp3(Experiment):
             q = a.colas
             quiet = evidence.queue_total(q["transacciones"]) == 0 and evidence.queue_total(q["comprobantes"]) == 0
             return a.ecuacion_ok and quiet and set(a.emitidas) <= (a.notificadas | a.dlq_comprobantes)
-        ok, secs = ctx.wait_until(converged, float(ctx.opt("timeout", mr * 180 + 300)), poll)
+        ok, secs = ctx.wait_until(converged, float(ctx.opt("timeout", self.scale_time(mr * 180 + 300, 3))), poll)
         acc = evidence.account(ctx, self.ciclo_id, ids)
         dedup = evidence.dedup_states(ctx, self.ciclo_id)
 

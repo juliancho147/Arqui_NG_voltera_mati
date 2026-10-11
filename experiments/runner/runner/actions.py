@@ -80,8 +80,8 @@ def _set_env(ctx: Context, fn: str, values: dict[str, str | None]) -> None:
     _wait_updated(ctx, fn)
 
 
-def inject_fault(ctx: Context, service: str, mode: str = "env") -> str:
-    """Degrada un servicio. mode=env (FORCE_FAIL=true) | concurrency (reserved concurrency = 0).
+def inject_fault(ctx: Context, service: str, mode: str = "env", rate: float | None = None) -> str:
+    """Degrada un servicio. mode=env (FORCE_FAIL=true) | concurrency (reserved concurrency = 0) | rate (FAIL_RATE=<rate>, fallo parcial).
     Registra el estado previo en la bitacora ANTES de modificar. Devuelve el id de la entrada."""
     fn = ctx.guard(ctx.cfg.lambda_name(service), "Lambda")
     lam = ctx.client("lambda")
@@ -94,6 +94,10 @@ def inject_fault(ctx: Context, service: str, mode: str = "env") -> str:
     env = lam.get_function_configuration(FunctionName=fn).get("Environment", {}).get("Variables", {})
     before = {"function": fn, **{k: env.get(k) for k in FAULT_VARS}}
     eid = ctx.journal.record("lambda_env", fn, before)
+    if mode == "rate":
+        _set_env(ctx, fn, {"FAIL_RATE": str(rate if rate is not None else 0.3)})
+        ctx.log(f"FALLO PARCIAL inyectado en {fn}: FAIL_RATE={rate if rate is not None else 0.3} (antes {before['FAIL_RATE']})")
+        return eid
     _set_env(ctx, fn, {"FORCE_FAIL": "true"})
     ctx.log(f"FALLO inyectado en {fn}: FORCE_FAIL=true (antes {before['FORCE_FAIL']})")
     return eid

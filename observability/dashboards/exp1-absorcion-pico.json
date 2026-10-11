@@ -1,23 +1,25 @@
 {
   "uid": "voltera-exp1-absorcion",
   "title": "Exp1 - Absorcion del pico (autoescalado)",
-  "description": "Queue-Based Load Leveling + KEDA: backlog, replicas, SLA del lote y cero perdidas.",
+  "description": "Queue-Based Load Leveling + KEDA: backlog, replicas y tiempo del lote vs SLA. Pensado para grabar.",
   "tags": [
     "voltera",
     "exp2",
-    "exp1"
+    "exp1",
+    "video"
   ],
   "schemaVersion": 39,
   "version": 1,
   "editable": true,
   "graphTooltip": 1,
-  "refresh": "30s",
+  "refresh": "5s",
   "time": {
-    "from": "now-1h",
+    "from": "now-15m",
     "to": "now"
   },
   "timepicker": {
     "refresh_intervals": [
+      "5s",
       "10s",
       "30s",
       "1m",
@@ -73,24 +75,6 @@
         "hide": 0,
         "current": {},
         "options": []
-      },
-      {
-        "type": "constant",
-        "name": "slaSeg",
-        "label": "SLA del lote (s)",
-        "query": "120",
-        "hide": 2,
-        "current": {
-          "text": "120",
-          "value": "120"
-        },
-        "options": [
-          {
-            "selected": true,
-            "text": "120",
-            "value": "120"
-          }
-        ]
       }
     ]
   },
@@ -107,6 +91,33 @@
         "iconColor": "rgba(0, 211, 255, 1)",
         "name": "Annotations & Alerts",
         "type": "dashboard"
+      },
+      {
+        "datasource": {
+          "type": "datasource",
+          "uid": "-- Dashboard --"
+        },
+        "enable": true,
+        "iconColor": "orange",
+        "name": "Pico inyectado",
+        "filter": {
+          "exclude": false,
+          "ids": [
+            8
+          ]
+        },
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
+        "mappings": {
+          "title": {
+            "source": "text",
+            "value": "Pico inyectado"
+          }
+        }
       }
     ]
   },
@@ -125,52 +136,280 @@
   "panels": [
     {
       "id": 1,
-      "type": "text",
-      "title": "Hipotesis",
-      "description": "",
-      "gridPos": {
-        "h": 3,
-        "w": 24,
-        "x": 0,
-        "y": 0
-      },
-      "targets": [],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "options": {
-        "mode": "markdown",
-        "content": "EventBridge dispara el cierre; se inyectan N transacciones en Kafka; KEDA escala `ms-process-billing` de 1 a n segun el lag, drena el backlog dentro del SLA (10 facturas en <= 2 min) y vuelve a 1 replica. **Cero perdidas por saturacion.** Escala <= 10: valida comportamiento, no capacidad."
-      }
-    },
-    {
-      "id": 2,
-      "type": "row",
-      "title": "Backlog y escalado",
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 3
-      },
-      "panels": []
-    },
-    {
-      "id": 3,
-      "type": "timeseries",
-      "title": "Lag del consumidor Kafka (grupo ms-process-billing)  (eje X: hora)",
-      "description": "KafkaConsumerLag lo publica cada pod con el lag de sus particiones cada 10 s. En un minuto hay 6 muestras por pod, asi que Sum/6 = lag total del grupo (asume METRICS_FLUSH_SECONDS=10). Aparece 1-2 min despues por la latencia de CloudWatch. Eje Y: Mensajes pendientes (lag). Eje X: tiempo (hora local).",
+      "type": "stat",
+      "title": "Tiempo del lote en segundos (SLA: 120 s)",
+      "description": "Que mirar: verde = el lote termino dentro del SLA de 120 s; rojo = lo supero. Aparece 1-2 min despues de cerrar el ultimo lote (latencia de CloudWatch). Patron de arquitectura: SLA de cierre de ciclo; criterio de aceptacion del ASR de absorcion de picos.",
       "datasource": {
         "type": "cloudwatch",
         "uid": "cloudwatch"
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
+        "h": 6,
+        "w": 8,
         "x": 0,
-        "y": 4
+        "y": 0
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "CicloDuracionSegundos",
+          "dimensions": {
+            "service": "ms-process-billing"
+          },
+          "statistic": "Maximum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "",
+          "expression": "",
+          "label": "tiempo del lote",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix: s",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 120
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "center",
+        "text": {
+          "valueSize": 72,
+          "titleSize": 20
+        }
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Replicas escaladas (pico)",
+      "description": "Que mirar: de 1 pod en reposo a 5 al llegar el pico (tope de KEDA). Patron de arquitectura: Autoescalado por evento (KEDA) sobre el lag del consumidor.",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 8,
+        "y": 0
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "ContainerInsights",
+          "metricName": "service_number_of_running_pods",
+          "dimensions": {
+            "ClusterName": "voltera-exp2-eph",
+            "Namespace": "voltera",
+            "Service": "ms-process-billing"
+          },
+          "statistic": "Maximum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "",
+          "expression": "",
+          "label": "replicas",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "max"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "center",
+        "text": {
+          "valueSize": 72,
+          "titleSize": 20
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Mensajes pendientes al llegar el pico (maximo)",
+      "description": "Que mirar: tamano del pico que hubo que absorber; luego el grafico de abajo debe llevarlo a 0. Patron de arquitectura: Queue-Based Load Leveling: la cola (Kafka) absorbe lo que el consumo aun no procesa.",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 0
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "Am",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "KafkaConsumerLag",
+          "dimensions": {
+            "service": "ms-process-billing",
+            "topic": "voltera.consumo-facturable-preparado"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "lag",
+          "expression": "",
+          "label": "muestras",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 1,
+          "expression": "lag / 6",
+          "id": "",
+          "period": "60",
+          "region": "default",
+          "label": "mensajes pendientes",
+          "hide": false,
+          "namespace": "",
+          "metricName": "",
+          "dimensions": {},
+          "statistic": "Average",
+          "matchExact": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "max"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "center",
+        "text": {
+          "valueSize": 72,
+          "titleSize": 20
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Pendientes por procesar (lag) y replicas que escalan  (eje X: hora)",
+      "description": "Que mirar: el lag sube de golpe al inyectar el lote y las replicas suben 1 -> 4 -> 5 unos 35 s despues; el lag cae a 0 y las replicas vuelven a 1. Lag = KafkaConsumerLag Sum/6 (6 muestras por minuto por pod; asume METRICS_FLUSH_SECONDS=10). Patron de arquitectura: Queue-Based Load Leveling + autoescalado por evento (KEDA, lagThreshold 2). Eje izq: mensajes; eje der: pods. Eje Y: Mensajes pendientes (lag). Eje X: tiempo (hora local).",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 6
       },
       "targets": [
         {
@@ -210,71 +449,20 @@
           "id": "",
           "period": "60",
           "region": "default",
-          "label": "lag total (mensajes pendientes)",
+          "label": "mensajes pendientes (lag)",
           "hide": false,
           "namespace": "",
           "metricName": "",
           "dimensions": {},
           "statistic": "Average",
           "matchExact": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "custom": {
-            "axisLabel": "Mensajes pendientes (lag)",
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 8,
-            "showPoints": "never",
-            "spanNulls": true,
-            "stacking": {
-              "mode": "none",
-              "group": "A"
-            }
-          },
-          "min": 0
         },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 4,
-      "type": "timeseries",
-      "title": "Replicas ms-process-billing (KEDA)  (eje X: hora)",
-      "description": "ContainerInsights/service_number_of_running_pods. Deben subir con el lag y bajar a 1 al drenar. Eje Y: Réplicas (pods). Eje X: tiempo (hora local).",
-      "datasource": {
-        "type": "cloudwatch",
-        "uid": "cloudwatch"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 4
-      },
-      "targets": [
         {
           "datasource": {
             "type": "cloudwatch",
             "uid": "cloudwatch"
           },
-          "refId": "A",
+          "refId": "B",
           "queryMode": "Metrics",
           "metricQueryType": 0,
           "metricEditorMode": 0,
@@ -299,7 +487,178 @@
         "defaults": {
           "unit": "short",
           "custom": {
-            "axisLabel": "Réplicas (pods)",
+            "axisLabel": "Mensajes pendientes (lag)",
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "replicas"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Replicas (pods)"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 3
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Facturas emitidas acumuladas (el lote avanza)  (eje X: hora)",
+      "description": "Que mirar: la curva de emitidas sube hasta alcanzar la meta (inyectadas); el instante en que la alcanza es el tiempo del lote. Patron de arquitectura: Cero perdida por saturacion: todo lo inyectado termina emitido aunque llegue en rafaga. Eje Y: Facturas acumuladas. Eje X: tiempo (hora local).",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "Am",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "FacturasEmitidas",
+          "dimensions": {
+            "service": "ms-facturacion"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "e",
+          "expression": "",
+          "label": "facturas emitidas",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 1,
+          "expression": "RUNNING_SUM(FILL(e,0))",
+          "id": "",
+          "period": "60",
+          "region": "default",
+          "label": "facturas emitidas",
+          "hide": false,
+          "namespace": "",
+          "metricName": "",
+          "dimensions": {},
+          "statistic": "Average",
+          "matchExact": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "Bm",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "UnidadesEnOutbox",
+          "dimensions": {
+            "service": "ms-orchestrator-billing"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "i",
+          "expression": "",
+          "label": "inyectadas (meta)",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "B",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 1,
+          "expression": "RUNNING_SUM(FILL(i,0))",
+          "id": "",
+          "period": "60",
+          "region": "default",
+          "label": "inyectadas (meta)",
+          "hide": false,
+          "namespace": "",
+          "metricName": "",
+          "dimensions": {},
+          "statistic": "Average",
+          "matchExact": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "axisLabel": "Facturas acumuladas",
             "drawStyle": "line",
             "lineWidth": 2,
             "fillOpacity": 8,
@@ -330,151 +689,19 @@
       }
     },
     {
-      "id": 5,
-      "type": "row",
-      "title": "Tiempo del lote vs SLA",
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 12
-      },
-      "panels": []
-    },
-    {
       "id": 6,
-      "type": "table",
-      "title": "Tiempo del lote por cicloId (inicio de ciclo -> ultima factura procesada)",
-      "description": "Compara 'segundos' con el SLA (variable slaSeg = 120). Las filas incluyen rechazos de negocio con la linea 'factura procesada'.",
-      "datasource": {
-        "type": "cloudwatch",
-        "uid": "cloudwatch"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 13
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "cloudwatch",
-            "uid": "cloudwatch"
-          },
-          "refId": "A",
-          "queryMode": "Logs",
-          "region": "default",
-          "id": "",
-          "expression": "fields toMillis(@timestamp) as t\n| filter cicloId like /$cicloId/ and (message = \"ciclo iniciado\" or message = \"factura procesada\")\n| stats min(t) as ini, max(t) as fin, count(*) as eventos by cicloId\n| fields cicloId, (fin - ini) / 1000 as segundos, eventos\n| sort segundos desc",
-          "logGroupNames": [
-            "/aws/lambda/voltera-exp2-ms-orchestrator-billing",
-            "/aws/lambda/voltera-exp2-ms-facturacion"
-          ],
-          "logGroups": [],
-          "statsGroups": []
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "align": "auto"
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "showHeader": true,
-        "cellHeight": "sm"
-      }
-    },
-    {
-      "id": 7,
-      "type": "stat",
-      "title": "Duracion del ultimo lote (s)",
-      "description": "Rojo si supera el SLA de 120 s (umbral fijo; coincide con batch_sla_seconds del plan).",
-      "datasource": {
-        "type": "cloudwatch",
-        "uid": "cloudwatch"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 4,
-        "x": 12,
-        "y": 13
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "cloudwatch",
-            "uid": "cloudwatch"
-          },
-          "refId": "A",
-          "queryMode": "Logs",
-          "region": "default",
-          "id": "",
-          "expression": "fields toMillis(@timestamp) as t\n| filter cicloId like /$cicloId/ and (message = \"ciclo iniciado\" or message = \"factura procesada\")\n| stats (max(t) - min(t)) / 1000 as segundos",
-          "logGroupNames": [
-            "/aws/lambda/voltera-exp2-ms-orchestrator-billing",
-            "/aws/lambda/voltera-exp2-ms-facturacion"
-          ],
-          "logGroups": [],
-          "statsGroups": []
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "suffix: s",
-          "decimals": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 120
-              }
-            ]
-          },
-          "color": {
-            "mode": "thresholds"
-          },
-          "noValue": "0"
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "background",
-        "graphMode": "none",
-        "textMode": "value_and_name",
-        "justifyMode": "center"
-      }
-    },
-    {
-      "id": 8,
       "type": "timeseries",
-      "title": "Tiempo por mensaje (s): total y sobrecosto  (eje X: hora)",
-      "description": "MensajeTotalMs / MensajeSobrecostoMs (ms en origen, convertidos a segundos). Eje Y: Segundos por mensaje. Eje X: tiempo (hora local).",
+      "title": "Tiempo por mensaje en segundos (total y sobrecosto)  (eje X: hora)",
+      "description": "Que mirar: el total debe rondar el retardo simulado (2 s); el sobrecosto (total - retardo) debe quedar bajo ~0,2 s. Si no, la demora esta en el escalado o el reparto de particiones, no en el servicio. Patron de arquitectura: Medicion del costo de la mensajeria durable (claim, SQS, commit) frente al trabajo util. Eje Y: Segundos por mensaje. Eje X: tiempo (hora local).",
       "datasource": {
         "type": "cloudwatch",
         "uid": "cloudwatch"
       },
       "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 13
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 16
       },
       "targets": [
         {
@@ -668,7 +895,8 @@
               "mode": "none",
               "group": "A"
             }
-          }
+          },
+          "decimals": 2
         },
         "overrides": []
       },
@@ -688,97 +916,32 @@
       }
     },
     {
-      "id": 9,
-      "type": "stat",
-      "title": "Duracion del ciclo (metrica CicloDuracionSegundos)",
-      "description": "Emitida por CycleState al completar el ciclo. Rojo si supera el SLA (120 s).",
-      "datasource": {
-        "type": "cloudwatch",
-        "uid": "cloudwatch"
-      },
+      "id": 7,
+      "type": "row",
+      "title": "Fuente de anotaciones (FaseExperimento; no se explica)",
+      "collapsed": false,
       "gridPos": {
-        "h": 8,
-        "w": 4,
+        "h": 1,
+        "w": 24,
         "x": 0,
-        "y": 21
+        "y": 25
       },
-      "targets": [
-        {
-          "datasource": {
-            "type": "cloudwatch",
-            "uid": "cloudwatch"
-          },
-          "refId": "A",
-          "queryMode": "Metrics",
-          "metricQueryType": 0,
-          "metricEditorMode": 0,
-          "namespace": "Voltera/Exp2",
-          "metricName": "CicloDuracionSegundos",
-          "dimensions": {
-            "service": "ms-process-billing"
-          },
-          "statistic": "Maximum",
-          "period": "60",
-          "region": "default",
-          "matchExact": true,
-          "id": "",
-          "expression": "",
-          "label": "duracion",
-          "hide": false
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "suffix: s",
-          "decimals": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 120
-              }
-            ]
-          },
-          "color": {
-            "mode": "thresholds"
-          },
-          "noValue": "0"
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "background",
-        "graphMode": "none",
-        "textMode": "value_and_name",
-        "justifyMode": "center"
-      }
+      "panels": []
     },
     {
-      "id": 10,
-      "type": "timeseries",
-      "title": "Throughput: facturas emitidas por minuto  (eje X: hora)",
-      "description": "Eje Y: Facturas por minuto. Eje X: tiempo (hora local).",
+      "id": 8,
+      "type": "table",
+      "title": "Marca: Pico inyectado",
+      "description": "CloudWatch Voltera/Exp2/FaseExperimento experimento=exp1 fase=disparo. Cada punto dibuja la anotacion 'Pico inyectado'.",
       "datasource": {
         "type": "cloudwatch",
         "uid": "cloudwatch"
       },
       "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 4,
-        "y": 21
+        "h": 3,
+        "w": 12,
+        "x": 0,
+        "y": 26
       },
       "targets": [
         {
@@ -791,9 +954,10 @@
           "metricQueryType": 0,
           "metricEditorMode": 0,
           "namespace": "Voltera/Exp2",
-          "metricName": "FacturasEmitidas",
+          "metricName": "FaseExperimento",
           "dimensions": {
-            "service": "ms-facturacion"
+            "experimento": "exp1",
+            "fase": "disparo"
           },
           "statistic": "Sum",
           "period": "60",
@@ -801,41 +965,21 @@
           "matchExact": true,
           "id": "",
           "expression": "",
-          "label": "emitidas/min",
+          "label": "disparo",
           "hide": false
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
           "custom": {
-            "axisLabel": "Facturas por minuto",
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 8,
-            "showPoints": "never",
-            "spanNulls": true,
-            "stacking": {
-              "mode": "none",
-              "group": "A"
-            }
+            "align": "auto"
           }
         },
         "overrides": []
       },
       "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
+        "showHeader": true,
+        "cellHeight": "sm"
       }
     }
   ]

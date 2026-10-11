@@ -55,6 +55,12 @@ spec:
               value: "${simulated_delay_seconds}"
             - name: HEALTH_PORT
               value: "8080"
+            - name: TABLE_RECONCILIACION
+              value: "${table_reconciliacion}"
+            - name: RECONCILE_AFTER_SECONDS
+              value: "${reconcile_after_seconds}"
+            - name: CONSUMER_CONCURRENCY
+              value: "${consumer_concurrency}"
             - name: METRICS_BACKEND
               value: ${metrics_backend}
             - name: CLOUDWATCH_NAMESPACE

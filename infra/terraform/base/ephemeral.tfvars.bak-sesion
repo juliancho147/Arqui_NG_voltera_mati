@@ -1,0 +1,5 @@
+# Generado para la sesión con stack efímero (se borra o se vacía antes de destruir el efímero)
+kafka_bootstrap_servers   = "a83cd18789ccb4707b4f74a55673c0e7-844c93c9ba93403e.elb.us-east-1.amazonaws.com:9094"
+lambda_subnet_ids         = ["subnet-0862c8ad347e0c200", "subnet-0e918f0b706e9939a"]
+lambda_security_group_ids = ["sg-010a5ac25c1004406"]
+powertools_layer_arn      = "arn:aws:lambda:us-east-1:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-arm64:38"

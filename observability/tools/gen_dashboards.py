@@ -85,8 +85,9 @@ def xr(refid, qtype, **kw):
 
 # ------------------------------------------------------------------ paneles
 class Board:
-    def __init__(self, uid, title, desc, tags, extra_vars=()):
+    def __init__(self, uid, title, desc, tags, extra_vars=(), refresh="30s", time_from="now-1h"):
         self.uid, self.title, self.desc, self.tags = uid, title, desc, tags
+        self.refresh, self.time_from, self.annos = refresh, time_from, []
         self.panels, self.x, self.y, self.rowh, self.nid = [], 0, 0, 0, 1
         self.extra_vars = list(extra_vars)
 
@@ -118,28 +119,35 @@ class Board:
         self.panels.append(p)
         return p
 
-    def ts(self, title, targets, unit="short", stack=False, w=12, h=8, desc="", min_=None, thresholds=None, ds=CW):
-        ylab = y_label(title, unit)
+    def ts(self, title, targets, unit="short", stack=False, w=12, h=8, desc="", min_=None, thresholds=None, ds=CW, ylab=None,
+           overrides=None, decimals=None):
+        ylab = ylab or y_label(title, unit)
         title = f"{title}  (eje X: hora)"
         desc = (desc + " " if desc else "") + f"Eje Y: {ylab}. Eje X: tiempo (hora local)."
         d = {"unit": unit, "custom": {"axisLabel": ylab, "drawStyle": "line", "lineWidth": 2, "fillOpacity": 15 if stack else 8, "showPoints": "never",
                                        "spanNulls": True, "stacking": {"mode": "normal" if stack else "none", "group": "A"}}}
         if min_ is not None:
             d["min"] = min_
+        if decimals is not None:
+            d["decimals"] = decimals
         if thresholds:
             d["thresholds"] = {"mode": "absolute", "steps": thresholds}
             d["custom"]["thresholdsStyle"] = {"mode": "line"}
-        return self.add("timeseries", title, targets, w, h, desc, ds, d,
+        return self.add("timeseries", title, targets, w, h, desc, ds, d, overrides=overrides,
                         options={"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"]},
                                  "tooltip": {"mode": "multi", "sort": "desc"}})
 
-    def stat(self, title, targets, calc="lastNotNull", unit="short", w=4, h=4, desc="", steps=None, color_mode="background", decimals=0):
+    def stat(self, title, targets, calc="lastNotNull", unit="short", w=4, h=4, desc="", steps=None, color_mode="background", decimals=0, value_size=None, mappings=None):
         steps = steps or [{"color": "green", "value": None}]
         d = {"unit": unit, "decimals": decimals, "thresholds": {"mode": "absolute", "steps": steps}, "color": {"mode": "thresholds"},
              "noValue": "0"}
-        return self.add("stat", title, targets, w, h, desc, CW, d,
-                        options={"reduceOptions": {"calcs": [calc], "fields": "", "values": False}, "colorMode": color_mode,
-                                 "graphMode": "none", "textMode": "value_and_name", "justifyMode": "center"})
+        if mappings:
+            d["mappings"] = mappings
+        opts = {"reduceOptions": {"calcs": [calc], "fields": "", "values": False}, "colorMode": color_mode,
+                "graphMode": "none", "textMode": "value_and_name", "justifyMode": "center"}
+        if value_size:  # tipografia grande para video
+            opts["text"] = {"valueSize": value_size, "titleSize": 20}
+        return self.add("stat", title, targets, w, h, desc, CW, d, options=opts)
 
     def table(self, title, targets, w=12, h=8, desc="", ds=CW, transformations=None):
         return self.add("table", title, targets, w, h, desc, ds, {"custom": {"align": "auto"}},
@@ -172,12 +180,12 @@ class Board:
                "current": {}, "options": []}
         return {
             "uid": self.uid, "title": self.title, "description": self.desc, "tags": ["voltera", "exp2"] + self.tags,
-            "schemaVersion": 39, "version": 1, "editable": True, "graphTooltip": 1, "refresh": "30s",
-            "time": {"from": "now-1h", "to": "now"}, "timepicker": {"refresh_intervals": ["10s", "30s", "1m", "5m"]},
+            "schemaVersion": 39, "version": 1, "editable": True, "graphTooltip": 1, "refresh": self.refresh,
+            "time": {"from": self.time_from, "to": "now"}, "timepicker": {"refresh_intervals": ["5s", "10s", "30s", "1m", "5m"]},
             "timezone": "browser", "fiscalYearStartMonth": 0, "liveNow": False,
             "templating": {"list": [cyc, sfn] + self.extra_vars},
             "annotations": {"list": [{"builtIn": 1, "datasource": {"type": "grafana", "uid": "-- Grafana --"}, "enable": True,
-                                      "hide": True, "iconColor": "rgba(0, 211, 255, 1)", "name": "Annotations & Alerts", "type": "dashboard"}]},
+                                      "hide": True, "iconColor": "rgba(0, 211, 255, 1)", "name": "Annotations & Alerts", "type": "dashboard"}] + self.annos},
             "links": [{"type": "dashboards", "tags": ["voltera"], "asDropdown": True, "title": "Dashboards Voltera", "includeVars": False,
                        "keepTime": True}],
             "panels": self.panels,
@@ -256,6 +264,8 @@ b.stat("Ciclos completados", [m("A", NS, "CiclosCompletados", svc("ms-process-bi
 b.stat("Ciclos fallidos", [m("A", NS, "CiclosFallidos", svc("ms-process-billing"), "Sum", 60)], calc="sum", w=4, steps=[{"color": "green", "value": None}, {"color": "red", "value": 1}])
 b.stat("Duracion del ciclo", [m("A", NS, "CicloDuracionSegundos", svc("ms-process-billing"), "Maximum", 60)], calc="lastNotNull", unit="s", w=4,
        steps=[{"color": "green", "value": None}, {"color": "red", "value": 120}])
+b.stat("Ciclos reconciliados", [m("A", NS, "CiclosReconciliados", svc("ms-process-billing"), "Sum", 60)], calc="sum", w=4,
+       desc="Ciclos cerrados por reconciliacion contra DynamoDB (evento de estado perdido).")
 b.stat("Fallos de publicacion al mesh", [expr("A", "SEARCH('{Voltera/Exp2,service} MetricName=\"MeshPublishFailures\"', 'Sum', 60)", "fallos")], calc="sum", w=4,
        steps=[{"color": "green", "value": None}, {"color": "orange", "value": 1}])
 b.stat("Health ms-process-billing", [expr("A", "SEARCH('{Voltera/Exp2,pod,service} MetricName=\"HealthCheckOk\" service=\"ms-process-billing\"', 'Minimum', 60)", "salud")], calc="lastNotNull", w=4,
@@ -275,155 +285,175 @@ b.table("Ultimos eventos del ciclo (logs estructurados)", [logs("A", STEP_LOGS_Q
         desc="Logs Insights sobre los logs JSON de Powertools (campos cicloId/facturaId).")
 b.save("00-ciclo-en-vivo.json")
 
+# =========================================================== dashboards para GRABAR (exp1, exp2, exp3)
+# Contrato con el runner: metrica CloudWatch FaseExperimento (namespace Voltera/Exp2), dimensiones experimento y fase, valor 1 en el
+# instante del evento. Las anotaciones de Grafana se alimentan de ella (ver anno()).
+FASES = {  # experimento -> [(fase, nombre de la anotacion, color)]
+    "exp1": [("disparo", "Pico inyectado", "orange")],
+    "exp2": [("fallo_inyectado", "Fallo inyectado", "red"), ("recuperacion", "Recuperacion", "green")],
+    "exp3": [("fallo_pod", "Pods muertos", "red"), ("fallo_lambda", "Fallo en Lambdas", "purple"), ("recuperacion", "Recuperacion", "green")],
+}
+BIG = 72  # tamano de fuente de los stats (video)
+
+
+def anno(b, exp):
+    """Fila final con un panel por fase (consulta FaseExperimento) y anotaciones que leen el resultado de esos paneles
+    (datasource '-- Dashboard --'). Los paneles son solo la fuente de datos; no se explican en la grabacion."""
+    b.row("Fuente de anotaciones (FaseExperimento; no se explica)")
+    for fase, nombre, color in FASES[exp]:
+        p = b.table(f"Marca: {nombre}", [m("A", NS, "FaseExperimento", {"experimento": exp, "fase": fase}, "Sum", 60, fase)], w=12, h=3,
+                    desc=f"CloudWatch {NS}/FaseExperimento experimento={exp} fase={fase}. Cada punto dibuja la anotacion '{nombre}'.")
+        b.annos.append({"datasource": {"type": "datasource", "uid": "-- Dashboard --"}, "enable": True, "iconColor": color, "name": nombre,
+                        "filter": {"exclude": False, "ids": [p["id"]]},
+                        "target": {"limit": 100, "matchAny": False, "tags": [], "type": "dashboard"},
+                        "mappings": {"title": {"source": "text", "value": nombre}}})
+
+
+def que(mirar, patron):
+    return f"Que mirar: {mirar} Patron de arquitectura: {patron}"
+
+
+def all_rechazos():
+    return [m("Rt", NS, "TarifasRechazadas", svc("ms-tarifas"), "Sum", 60, "rt", "rt", True),
+            m("Rc", NS, "CalculosRechazados", svc("ms-calculo-consumo-neto"), "Sum", 60, "rc", "rc", True),
+            m("Re", NS, "EmisionesRechazadas", svc("ms-facturacion"), "Sum", 60, "re", "re", True)]
+
+
+RED_AT = lambda v: [{"color": "green", "value": None}, {"color": "red", "value": v}]
+
 # =========================================================== exp1
-b = Board("voltera-exp1-absorcion", "Exp1 - Absorcion del pico (autoescalado)", "Queue-Based Load Leveling + KEDA: backlog, replicas, SLA del lote y cero perdidas.",
-          ["exp1"], extra_vars=[{"type": "constant", "name": "slaSeg", "label": "SLA del lote (s)", "query": "120", "hide": 2,
-                                  "current": {"text": "120", "value": "120"}, "options": [{"selected": True, "text": "120", "value": "120"}]}])
-b.text("Hipotesis", "EventBridge dispara el cierre; se inyectan N transacciones en Kafka; KEDA escala `ms-process-billing` de 1 a n segun el lag, drena el backlog dentro del SLA "
-       "(10 facturas en <= 2 min) y vuelve a 1 replica. **Cero perdidas por saturacion.** Escala <= 10: valida comportamiento, no capacidad.", h=3)
-b.row("Backlog y escalado")
-b.ts("Lag del consumidor Kafka (grupo ms-process-billing)",
+b = Board("voltera-exp1-absorcion", "Exp1 - Absorcion del pico (autoescalado)",
+          "Queue-Based Load Leveling + KEDA: backlog, replicas y tiempo del lote vs SLA. Pensado para grabar.", ["exp1", "video"],
+          refresh="5s", time_from="now-15m")
+b.stat("Tiempo del lote en segundos (SLA: 120 s)", [m("A", NS, "CicloDuracionSegundos", svc("ms-process-billing"), "Maximum", 60, "tiempo del lote")],
+       calc="lastNotNull", unit="suffix: s", w=8, h=6, steps=RED_AT(120), value_size=BIG, decimals=1,
+       desc=que("verde = el lote termino dentro del SLA de 120 s; rojo = lo supero. Aparece 1-2 min despues de cerrar el ultimo lote (latencia de CloudWatch).",
+                "SLA de cierre de ciclo; criterio de aceptacion del ASR de absorcion de picos."))
+b.stat("Replicas escaladas (pico)", [m("A", CI, "service_number_of_running_pods", {"ClusterName": CL, "Namespace": KNS, "Service": "ms-process-billing"}, "Maximum", 60, "replicas")],
+       calc="max", w=8, h=6, steps=[{"color": "blue", "value": None}], value_size=BIG,
+       desc=que("de 1 pod en reposo a 5 al llegar el pico (tope de KEDA).", "Autoescalado por evento (KEDA) sobre el lag del consumidor."))
+b.stat("Mensajes pendientes al llegar el pico (maximo)",
+       [m("Am", "Voltera/Exp2", "KafkaConsumerLag", {"service": "ms-process-billing", "topic": "voltera.consumo-facturable-preparado"}, "Sum", 60, "muestras", "lag", True),
+        expr("A", "lag / 6", "mensajes pendientes")],
+       calc="max", w=8, h=6, steps=[{"color": "orange", "value": None}], value_size=BIG,
+       desc=que("tamano del pico que hubo que absorber; luego el grafico de abajo debe llevarlo a 0.", "Queue-Based Load Leveling: la cola (Kafka) absorbe lo que el consumo aun no procesa."))
+b.ts("Pendientes por procesar (lag) y replicas que escalan",
      [m("Am", "Voltera/Exp2", "KafkaConsumerLag", {"service": "ms-process-billing", "topic": "voltera.consumo-facturable-preparado"}, "Sum", 60, "muestras sumadas", "lag", True),
-      expr("A", "lag / 6", "lag total (mensajes pendientes)", 60)],
-     w=12, h=8, min_=0, desc="KafkaConsumerLag lo publica cada pod con el lag de sus particiones cada 10 s. En un minuto hay 6 muestras por pod, asi que Sum/6 = lag total del grupo "
-     "(asume METRICS_FLUSH_SECONDS=10). Aparece 1-2 min despues por la latencia de CloudWatch.")
-b.ts("Replicas ms-process-billing (KEDA)", [m("A", CI, "service_number_of_running_pods", {"ClusterName": CL, "Namespace": KNS, "Service": "ms-process-billing"}, "Maximum", 60, "replicas")],
-     w=12, h=8, min_=0, desc="ContainerInsights/service_number_of_running_pods. Deben subir con el lag y bajar a 1 al drenar.")
-b.row("Tiempo del lote vs SLA")
-b.table("Tiempo del lote por cicloId (inicio de ciclo -> ultima factura procesada)",
-        [logs("A", 'fields toMillis(@timestamp) as t\n| filter cicloId like /$cicloId/ and (message = "ciclo iniciado" or message = "factura procesada")\n'
-                   '| stats min(t) as ini, max(t) as fin, count(*) as eventos by cicloId\n| fields cicloId, (fin - ini) / 1000 as segundos, eventos\n| sort segundos desc',
-              [LG["ms-orchestrator-billing"], LG["ms-facturacion"]])], w=12, h=8,
-        desc="Compara 'segundos' con el SLA (variable slaSeg = 120). Las filas incluyen rechazos de negocio con la linea 'factura procesada'.")
-b.stat("Duracion del ultimo lote (s)", [logs("A", 'fields toMillis(@timestamp) as t\n| filter cicloId like /$cicloId/ and (message = "ciclo iniciado" or message = "factura procesada")\n'
-                                                  '| stats (max(t) - min(t)) / 1000 as segundos',
-                                                  [LG["ms-orchestrator-billing"], LG["ms-facturacion"]])],
-       calc="lastNotNull", unit="suffix: s", w=4, h=8, steps=[{"color": "green", "value": None}, {"color": "red", "value": 120}],
-       desc="Rojo si supera el SLA de 120 s (umbral fijo; coincide con batch_sla_seconds del plan).")
-b.ts("Tiempo por mensaje (s): total y sobrecosto",
+      expr("A", "lag / 6", "mensajes pendientes (lag)", 60),
+      m("B", CI, "service_number_of_running_pods", {"ClusterName": CL, "Namespace": KNS, "Service": "ms-process-billing"}, "Maximum", 60, "replicas")],
+     w=24, h=10, min_=0, ylab="Mensajes pendientes (lag)",
+     overrides=[{"matcher": {"id": "byName", "options": "replicas"}, "properties": [
+         {"id": "custom.axisPlacement", "value": "right"}, {"id": "custom.axisLabel", "value": "Replicas (pods)"},
+         {"id": "custom.fillOpacity", "value": 0}, {"id": "custom.lineWidth", "value": 3}, {"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}]}],
+     desc=que("el lag sube de golpe al inyectar el lote y las replicas suben 1 -> 4 -> 5 unos 35 s despues; el lag cae a 0 y las replicas vuelven a 1. "
+              "Lag = KafkaConsumerLag Sum/6 (6 muestras por minuto por pod; asume METRICS_FLUSH_SECONDS=10).",
+              "Queue-Based Load Leveling + autoescalado por evento (KEDA, lagThreshold 2). Eje izq: mensajes; eje der: pods."))
+b.ts("Facturas emitidas acumuladas (el lote avanza)",
+     cumulative("A", NS, "FacturasEmitidas", svc("ms-facturacion"), "facturas emitidas", "e") +
+     cumulative("B", NS, "UnidadesEnOutbox", svc("ms-orchestrator-billing"), "inyectadas (meta)", "i"),
+     w=12, h=9, min_=0, ylab="Facturas acumuladas",
+     desc=que("la curva de emitidas sube hasta alcanzar la meta (inyectadas); el instante en que la alcanza es el tiempo del lote.",
+              "Cero perdida por saturacion: todo lo inyectado termina emitido aunque llegue en rafaga."))
+b.ts("Tiempo por mensaje en segundos (total y sobrecosto)",
      [m("A", NS, "MensajeTotalMs", svc("ms-process-billing"), "Average", 60, "tot_avg", "ta", True),
       m("B", NS, "MensajeTotalMs", svc("ms-process-billing"), "Maximum", 60, "tot_max", "tm", True),
       m("C", NS, "MensajeSobrecostoMs", svc("ms-process-billing"), "Average", 60, "sob_avg", "sa", True),
       m("D", NS, "MensajeSobrecostoMs", svc("ms-process-billing"), "Maximum", 60, "sob_max", "sm", True),
       expr("E", "ta/1000", "total promedio"), expr("F", "tm/1000", "total maximo"),
       expr("G", "sa/1000", "sobrecosto promedio"), expr("H", "sm/1000", "sobrecosto maximo")],
-     unit="s", w=8, h=8, desc="MensajeTotalMs / MensajeSobrecostoMs (ms en origen, convertidos a segundos).")
-b.stat("Duracion del ciclo (metrica CicloDuracionSegundos)", [m("A", NS, "CicloDuracionSegundos", svc("ms-process-billing"), "Maximum", 60, "duracion")],
-       calc="lastNotNull", unit="suffix: s", w=4, h=8, steps=[{"color": "green", "value": None}, {"color": "red", "value": 120}],
-       desc="Emitida por CycleState al completar el ciclo. Rojo si supera el SLA (120 s).")
-b.ts("Throughput: facturas emitidas por minuto", [m("A", NS, "FacturasEmitidas", svc("ms-facturacion"), "Sum", 60, "emitidas/min")], w=8, h=8)
+     unit="s", w=12, h=9, ylab="Segundos por mensaje", decimals=2,
+     desc=que("el total debe rondar el retardo simulado (2 s); el sobrecosto (total - retardo) debe quedar bajo ~0,2 s. Si no, la demora esta en el escalado o el reparto de particiones, no en el servicio.",
+              "Medicion del costo de la mensajeria durable (claim, SQS, commit) frente al trabajo util."))
+anno(b, "exp1")
 b.save("exp1-absorcion-pico.json")
 
 # =========================================================== exp2
-b = Board("voltera-exp2-aislamiento", "Exp2 - Caida de un dependiente (aislamiento)", "Async messaging + Bulkhead + DLQ + Retry: fallos aislados, backlog y reproceso.", ["exp2"])
-b.text("Hipotesis", "Si se degrada `ms-tarifas` (caso a) o `ms-comprobante-factura` (caso b), las transacciones afectadas se reintentan (Step Functions: 3 intentos, backoff x2; SQS maxReceiveCount 3) "
-       "y caen a la DLQ; el resto del flujo sigue y Kafka/`process-billing` siguen encolando. Al recuperarse, la DLQ se reprocesa (redrive).", h=3)
-b.row("DLQ y backlog")
-b.stat("DLQ transacciones", [m("A", "AWS/SQS", "ApproximateNumberOfMessagesVisible", {"QueueName": Q_TX_DLQ}, "Maximum", 60)], w=4, h=5,
-       steps=[{"color": "green", "value": None}, {"color": "red", "value": 1}])
-b.stat("DLQ comprobantes", [m("A", "AWS/SQS", "ApproximateNumberOfMessagesVisible", {"QueueName": Q_CO_DLQ}, "Maximum", 60)], w=4, h=5,
-       steps=[{"color": "green", "value": None}, {"color": "red", "value": 1}])
-b.ts("Mensajes en DLQ", [m("A", "AWS/SQS", "ApproximateNumberOfMessagesVisible", {"QueueName": Q_TX_DLQ}, "Maximum", 60, "DLQ transacciones"),
-                         m("B", "AWS/SQS", "ApproximateNumberOfMessagesVisible", {"QueueName": Q_CO_DLQ}, "Maximum", 60, "DLQ comprobantes")], w=16, h=5, min_=0)
-b.ts("Backlog de la cola de transacciones (sigue acumulando)", [m("A", "AWS/SQS", "ApproximateNumberOfMessagesVisible", {"QueueName": Q_TX}, "Maximum", 60, "visibles"),
-                                                              m("B", "AWS/SQS", "ApproximateNumberOfMessagesNotVisible", {"QueueName": Q_TX}, "Maximum", 60, "en vuelo"),
-                                                              m("C", "AWS/SQS", "NumberOfMessagesSent", {"QueueName": Q_TX}, "Sum", 60, "enviados (ingreso)")])
-b.ts("Backlog de la cola de comprobantes (bulkhead)", [m("A", "AWS/SQS", "ApproximateNumberOfMessagesVisible", {"QueueName": Q_CO}, "Maximum", 60, "visibles"),
-                                                     m("B", "AWS/SQS", "ApproximateNumberOfMessagesNotVisible", {"QueueName": Q_CO}, "Maximum", 60, "en vuelo"),
-                                                     m("C", "AWS/SQS", "ApproximateAgeOfOldestMessage", {"QueueName": Q_CO}, "Maximum", 60, "edad mas antiguo (s)")])
-b.row("Reintentos y fallos (Step Functions)")
-b.ts("Ejecuciones Step Functions", [m("A", "AWS/States", "ExecutionsStarted", {"StateMachineArn": "$sfn"}, "Sum", 60, "iniciadas"),
-                                    m("B", "AWS/States", "ExecutionsSucceeded", {"StateMachineArn": "$sfn"}, "Sum", 60, "exitosas"),
-                                    m("C", "AWS/States", "ExecutionsFailed", {"StateMachineArn": "$sfn"}, "Sum", 60, "fallidas"),
-                                    m("D", "AWS/States", "ExecutionsTimedOut", {"StateMachineArn": "$sfn"}, "Sum", 60, "timeout"),
-                                    m("E", "AWS/States", "ExecutionThrottled", {"StateMachineArn": "$sfn"}, "Sum", 60, "throttled")],
-     desc="El Catch de cada tarea envia a la DLQ y termina la ejecucion con exito: fallos agotados NO aparecen como ExecutionsFailed sino en la DLQ.")
-b.table("Reintentos por tipo de evento de Step Functions (Logs Insights)",
-        [logs("A", 'fields type\n| filter type in ["TaskStateEntered","TaskScheduled","TaskFailed","TaskTimedOut","TaskSucceeded","ExecutionFailed","ExecutionSucceeded"]\n'
-                   '| stats count(*) as n by type\n| sort n desc', [LG_SFN])],
-        desc="Reintentos = TaskScheduled - TaskStateEntered de las tareas Lambda. (Tipos de evento sin verificar contra AWS: ver README.)")
-b.row("Lambdas")
-lambdas_health(b, with_duration=True)
-b.ts("Fallos de notificacion (ms-comprobante-factura)", [m("A", NS, "NotificacionesFallidas", svc("ms-comprobante-factura"), "Sum", 60, "fallidas"),
-                                                         m("B", NS, "FacturasNotificadas", svc("ms-comprobante-factura"), "Sum", 60, "notificadas")])
-b.row("Reproceso de la DLQ (SQS redrive)")
-b.ts("DLQ: visibles vs. consumidos por redrive", [m("A", "AWS/SQS", "ApproximateNumberOfMessagesVisible", {"QueueName": Q_TX_DLQ}, "Maximum", 60, "visibles"),
-                                                  m("B", "AWS/SQS", "NumberOfMessagesDeleted", {"QueueName": Q_TX_DLQ}, "Sum", 60, "borrados/redrive"),
-                                                  m("C", "AWS/SQS", "NumberOfMessagesReceived", {"QueueName": Q_TX_DLQ}, "Sum", 60, "recibidos")],
-     desc="Tras el StartMessageMoveTask la serie 'visibles' cae a 0 y 'borrados' sube.")
-b.ts("Tras el redrive: facturas emitidas / notificadas", [m("A", NS, "FacturasEmitidas", svc("ms-facturacion"), "Sum", 60, "emitidas"),
-                                                         m("B", NS, "FacturasNotificadas", svc("ms-comprobante-factura"), "Sum", 60, "notificadas")])
-b.row("Servicios en linea (referencia)")
-b.ts("Replicas ms-process-billing (sigue encolando)", [m("A", CI, "service_number_of_running_pods", {"ClusterName": CL, "Namespace": KNS, "Service": "ms-process-billing"}, "Maximum", 60, "replicas"),
-                                                       m("B", CI, "pod_number_of_container_restarts", {"ClusterName": CL, "Namespace": KNS, "PodName": "ms-process-billing"}, "Maximum", 60, "reinicios")],
-     w=12, min_=0, desc="Proxy de 'servicios en linea' mientras no exista endpoint de salud dummy con metrica.")
-b.ts("HealthCheckOk por pod (servicio en linea)", [expr("A", "SEARCH('{Voltera/Exp2,pod,service} MetricName=\"HealthCheckOk\" service=\"ms-process-billing\"', 'Minimum', 60)", "${PROP('Dim.pod')}")],
-     w=12, min_=0, desc="1 = /healthz responde OK en cada volcado (10 s); 0 = hilo caido. Referencia de 'servicios en linea' durante la falla inyectada.")
+b = Board("voltera-exp2-aislamiento", "Exp2 - Caida de un dependiente (aislamiento)",
+          "Async messaging + Bulkhead + DLQ + Retry: un dependiente caido no tumba el resto. Pensado para grabar.", ["exp2", "video"],
+          refresh="5s", time_from="now-15m")
+b.stat("Mensajes atascados en DLQ (lo que fallo de verdad)",
+       [m("A", "AWS/SQS", "ApproximateNumberOfMessagesVisible", {"QueueName": Q_TX_DLQ}, "Maximum", 60, "tx", "d1", True),
+        m("B", "AWS/SQS", "ApproximateNumberOfMessagesVisible", {"QueueName": Q_CO_DLQ}, "Maximum", 60, "co", "d2", True),
+        expr("C", "FILL(d1,0)+FILL(d2,0)", "en DLQ")],
+       calc="lastNotNull", w=8, h=6, steps=[{"color": "green", "value": None}, {"color": "red", "value": 1}], value_size=BIG,
+       desc=que("sube de 0 cuando el dependiente caido agota sus reintentos y baja a 0 tras el redrive (recuperacion).",
+                "Dead Letter Queue: lo que no se pudo procesar se aparta sin perderse y sin frenar al resto."))
+b.stat("Facturas emitidas (siguen subiendo)", [m("A", NS, "FacturasEmitidas", svc("ms-facturacion"), "Sum", 60, "emitidas")],
+       calc="sum", w=8, h=6, steps=[{"color": "blue", "value": None}], value_size=BIG,
+       desc=que("el contador no se congela durante el fallo: el resto del flujo sigue facturando.", "Bulkhead: el fallo queda contenido en un solo dependiente."))
+b.stat("Servicios en linea (ms-process-billing)",
+       [expr("A", "MIN(SEARCH('{Voltera/Exp2,pod,service} MetricName=\"HealthCheckOk\" service=\"ms-process-billing\"', 'Minimum', 60))", "disponibilidad")],
+       calc="lastNotNull", w=8, h=6, value_size=BIG,
+       steps=[{"color": "red", "value": None}, {"color": "green", "value": 1}],
+       mappings=[{"type": "value", "options": {"1": {"text": "EN LINEA", "color": "green"}, "0": {"text": "CAIDO", "color": "red"}}}],
+       desc=que("debe permanecer EN LINEA durante todo el fallo: el ingreso no depende del dependiente caido.", "Aislamiento por mensajeria asincrona: productor y consumidor desacoplados."))
+b.ts("Cola y DLQ del dependiente caido",
+     [m("A", "AWS/SQS", "ApproximateNumberOfMessagesVisible", {"QueueName": Q_CO}, "Maximum", 60, "comprobantes en cola"),
+      m("B", "AWS/SQS", "ApproximateNumberOfMessagesNotVisible", {"QueueName": Q_CO}, "Maximum", 60, "comprobantes en proceso"),
+      m("C", "AWS/SQS", "ApproximateNumberOfMessagesVisible", {"QueueName": Q_CO_DLQ}, "Maximum", 60, "DLQ comprobantes"),
+      m("D", "AWS/SQS", "ApproximateNumberOfMessagesVisible", {"QueueName": Q_TX_DLQ}, "Maximum", 60, "DLQ transacciones"),
+      m("E", "AWS/SQS", "ApproximateNumberOfMessagesVisible", {"QueueName": Q_TX}, "Maximum", 60, "transacciones en cola")],
+     w=12, h=9, min_=0, ylab="Mensajes en cola",
+     desc=que("tras 'Fallo inyectado' la cola del dependiente (ms-comprobante-factura caso b) o la DLQ de transacciones (ms-tarifas caso a) crece; tras 'Recuperacion' vuelve a 0.",
+              "Queue-Based Load Leveling + Retry con backoff + DLQ: el backlog se acumula en la cola, no en quien llama."))
+b.ts("Facturas emitidas y notificadas (acumulado)",
+     cumulative("A", NS, "FacturasEmitidas", svc("ms-facturacion"), "emitidas", "e") +
+     cumulative("B", NS, "FacturasNotificadas", svc("ms-comprobante-factura"), "notificadas", "n"),
+     w=12, h=9, min_=0, ylab="Facturas acumuladas",
+     desc=que("'emitidas' sigue subiendo durante el fallo; 'notificadas' se aplana si cae el comprobante y alcanza a emitidas tras la recuperacion.",
+              "Bulkhead + desacople por cola: emitir no espera a notificar."))
+b.ts("Errores de Step Functions y reintentos",
+     [m("A", "AWS/States", "ExecutionsStarted", {"StateMachineArn": "$sfn"}, "Sum", 60, "ejecuciones iniciadas"),
+      m("B", "AWS/States", "ExecutionsFailed", {"StateMachineArn": "$sfn"}, "Sum", 60, "ejecuciones fallidas"),
+      m("C", "AWS/States", "ExecutionsTimedOut", {"StateMachineArn": "$sfn"}, "Sum", 60, "ejecuciones con timeout"),
+      expr("D", f"SUM(SEARCH('{{AWS/Lambda,FunctionName}} MetricName=\"Errors\" {P}', 'Sum', 60))", "errores de Lambda (disparan reintentos)")],
+     w=24, h=8, min_=0, ylab="Eventos por minuto",
+     desc=que("los errores de Lambda suben durante el fallo (son los reintentos); 'fallidas' casi no se mueve porque el Catch manda a la DLQ y la ejecucion termina con exito.",
+              "Retry con backoff exponencial y Catch hacia DLQ en la orquestacion (Saga / Step Functions)."))
+anno(b, "exp2")
 b.save("exp2-caida-dependiente.json")
 
 # =========================================================== exp3
-b = Board("voltera-exp3-cero-perdida", "Exp3 - Cero perdida de solicitudes", "Durable messaging + at-least-once + idempotencia + outbox: inyectadas = emitidas + DLQ.", ["exp3"])
-b.text("Hipotesis y ecuacion", "**Conservacion:** `inyectadas = facturas emitidas + rechazos de negocio + mensajes en DLQ`. Un consumidor que muere a mitad de proceso no pierde mensajes (se reentregan) "
-       "y la idempotencia (process-billing, ms-facturacion, ms-comprobante-factura) evita facturas duplicadas. Las metricas no llevan cicloId: ajusta el rango a la corrida.", h=3)
-b.row("Ecuacion de conservacion")
-b.stat("Inyectadas", [m("A", NS, "UnidadesEnOutbox", svc("ms-orchestrator-billing"), "Sum", 60)], calc="sum", w=4, h=5)
-b.stat("Facturas emitidas", [m("A", NS, "FacturasEmitidas", svc("ms-facturacion"), "Sum", 60)], calc="sum", w=4, h=5)
-b.stat("Rechazos de negocio", [m("A", NS, "TarifasRechazadas", svc("ms-tarifas"), "Sum", 60, "t", "rt", True),
-                               m("B", NS, "CalculosRechazados", svc("ms-calculo-consumo-neto"), "Sum", 60, "c", "rc", True),
-                               m("C", NS, "EmisionesRechazadas", svc("ms-facturacion"), "Sum", 60, "e", "re", True),
-                               expr("D", "FILL(rt,0)+FILL(rc,0)+FILL(re,0)", "rechazos")], calc="sum", w=4, h=5)
-b.stat("En DLQ (transacciones)", [m("A", "AWS/SQS", "ApproximateNumberOfMessagesVisible", {"QueueName": Q_TX_DLQ}, "Maximum", 60)], w=4, h=5,
-       steps=[{"color": "green", "value": None}, {"color": "orange", "value": 1}])
-b.stat("Saldo (debe ser 0 al terminar)", q_loss_balance(), w=8, h=5, steps=[{"color": "green", "value": None}, {"color": "red", "value": 1}],
-       desc="inyectadas - (emitidas + rechazos + DLQ). Positivo = en vuelo o perdidas.")
-b.ts("Saldo acumulado en el tiempo", q_loss_balance(), min_=0, w=12, desc="Debe subir al inyectar y converger a 0.")
-b.table("Tabla de conservacion (totales del rango)",
-        [m("A", NS, "UnidadesEnOutbox", svc("ms-orchestrator-billing"), "Sum", 60, "1 inyectadas"),
-         m("B", NS, "FacturasEmitidas", svc("ms-facturacion"), "Sum", 60, "2 emitidas"),
-         m("C", NS, "FacturasNotificadas", svc("ms-comprobante-factura"), "Sum", 60, "3 notificadas"),
-         m("D", NS, "NotificacionesFallidas", svc("ms-comprobante-factura"), "Sum", 60, "4 notificaciones fallidas (intentos)"),
-         m("E", "AWS/SQS", "ApproximateNumberOfMessagesVisible", {"QueueName": Q_TX_DLQ}, "Maximum", 60, "5 DLQ transacciones"),
-         m("F", "AWS/SQS", "ApproximateNumberOfMessagesVisible", {"QueueName": Q_CO_DLQ}, "Maximum", 60, "6 DLQ comprobantes")], w=12,
-        transformations=[{"id": "reduce", "options": {"reducers": ["sum", "max", "lastNotNull"], "mode": "seriesToRows"}}])
-b.row("Reentregas (at-least-once)")
-b.ts("Reentregas SQS transacciones (recibidos - enviados, acumulado)",
-     [m("A", "AWS/SQS", "NumberOfMessagesReceived", {"QueueName": Q_TX}, "Sum", 60, "rcv", "rcv", True),
-      m("B", "AWS/SQS", "NumberOfMessagesSent", {"QueueName": Q_TX}, "Sum", 60, "snt", "snt", True),
-      expr("C", "RUNNING_SUM(FILL(rcv,0)) - RUNNING_SUM(FILL(snt,0))", "reentregas aprox.")],
-     desc="Aproximacion: cada recepcion adicional a un envio es una reentrega (visibility timeout vencido / consumidor muerto).")
-b.ts("Mensajes en vuelo y reentregas de comprobantes",
-     [m("A", "AWS/SQS", "ApproximateNumberOfMessagesNotVisible", {"QueueName": Q_CO}, "Maximum", 60, "en vuelo"),
-      m("B", "AWS/SQS", "NumberOfMessagesReceived", {"QueueName": Q_CO}, "Sum", 60, "recibidos", "rcv", True),
-      m("C", "AWS/SQS", "NumberOfMessagesSent", {"QueueName": Q_CO}, "Sum", 60, "enviados", "snt", True),
-      expr("D", "RUNNING_SUM(FILL(rcv,0)) - RUNNING_SUM(FILL(snt,0))", "reentregas aprox.")])
-b.ts("Reentregas Kafka tras muerte del pod (MensajesReenviados)", [m("A", NS, "MensajesReenviados", svc("ms-process-billing"), "Sum", 60, "reenviados")], w=12, h=8,
-     desc="Mensajes que el pod nuevo encontro en PROCESANDO y volvio a publicar en SQS tras la muerte del anterior.")
-b.ts("Duplicados descartados en el ingreso (dedup de process-billing)", [m("A", NS, "MensajesDuplicados", svc("ms-process-billing"), "Sum", 60, "duplicados"),
-                                                                           m("B", NS, "TransaccionesEnviadasASqs", svc("ms-process-billing"), "Sum", 60, "enviadas a SQS")], w=12,
-     desc="EMF de process-billing: volcado cada 10 s por EmfAggregator.")
-b.row("Idempotencia y facturas")
-b.table("Facturas con mas de una ejecucion (idempotencia: reintento absorbido)",
-        [logs("A", 'filter message = "factura procesada" and cicloId like /$cicloId/\n| stats count(*) as ejecuciones, count_distinct(numero) as numeros_distintos by facturaId\n'
-                   '| filter ejecuciones > 1\n| sort ejecuciones desc', [LG["ms-facturacion"]])], w=12,
-        desc="'ejecuciones - 1' = duplicados evitados por idempotencia. numeros_distintos debe ser 1 (misma factura, mismo consecutivo).")
-b.stat("Facturas con numero duplicado (debe ser 0)",
-       [logs("A", 'filter message = "factura procesada" and cicloId like /$cicloId/ and ispresent(numero)\n| stats count_distinct(numero) as numeros, count_distinct(facturaId) as facturas\n'
-                  '| display (numeros - facturas) as duplicadas', [LG["ms-facturacion"]])], w=6, h=8,
-       steps=[{"color": "green", "value": None}, {"color": "red", "value": 1}],
-       desc="numeros distintos - facturas distintas. >0 = una factura recibio mas de un consecutivo.")
-b.stat("Facturas emitidas (metrica)", [m("A", NS, "FacturasEmitidas", svc("ms-facturacion"), "Sum", 60)], calc="sum", w=6, h=8)
-b.ts("Facturas emitidas vs notificadas", cumulative("A", NS, "FacturasEmitidas", svc("ms-facturacion"), "emitidas", "e") +
-     cumulative("B", NS, "FacturasNotificadas", svc("ms-comprobante-factura"), "notificadas", "n"), w=12)
-b.ts("Replays de idempotencia (duplicados evitados)", [m("A", NS, "IdempotenciaReplays", svc("ms-facturacion"), "Sum", 60, "ms-facturacion"),
-                                                       m("B", NS, "IdempotenciaReplays", svc("ms-comprobante-factura"), "Sum", 60, "ms-comprobante-factura"),
-                                                       m("C", NS, "MensajesDuplicados", svc("ms-process-billing"), "Sum", 60, "ingreso (dedup process-billing)")], w=12,
-     desc="Cada replay = un reintento/entrega repetida absorbida sin re-emitir.")
-b.row("Outbox")
-b.ts("Outbox: eventos publicados por el relay", [m("A", NS, "EventosPublicadosOutbox", svc("outbox-relay"), "Sum", 60, "publicados"),
-                                                 m("B", NS, "UnidadesEnOutbox", svc("ms-orchestrator-billing"), "Sum", 60, "escritos en outbox")],
-     desc="Si publicados < escritos hay eventos pendientes de relay (la fila sigue en la tabla outbox).")
-b.ts("Errores del relay", [m("A", "AWS/Lambda", "Errors", {"FunctionName": f"{P}-outbox-relay"}, "Sum", 60, "errores relay"),
-                           m("B", "AWS/Lambda", "IteratorAge", {"FunctionName": f"{P}-outbox-relay"}, "Maximum", 60, "IteratorAge (ms)")])
+b = Board("voltera-exp3-cero-perdida", "Exp3 - Cero perdida de solicitudes",
+          "Durable messaging + at-least-once + idempotencia + outbox: inyectadas = emitidas + rechazadas + DLQ. Pensado para grabar.", ["exp3", "video"],
+          refresh="5s", time_from="now-15m")
+CONT_Q = ([m("A", NS, "UnidadesEnOutbox", svc("ms-orchestrator-billing"), "Sum", 60, "inyectadas", "inj", True),
+           m("B", NS, "FacturasEmitidas", svc("ms-facturacion"), "Sum", 60, "emitidas", "em", True)] + all_rechazos() +
+          [m("F", "AWS/SQS", "ApproximateNumberOfMessagesVisible", {"QueueName": Q_TX_DLQ}, "Maximum", 60, "dlq", "dlq", True)])
+CONT_EXPR = "RUNNING_SUM(FILL(em,0)) + RUNNING_SUM(FILL(rt,0)) + RUNNING_SUM(FILL(rc,0)) + RUNNING_SUM(FILL(re,0)) + FILL(dlq,0)"
+b.stat("Solicitudes inyectadas", [m("A", NS, "UnidadesEnOutbox", svc("ms-orchestrator-billing"), "Sum", 60, "inyectadas")],
+       calc="sum", w=5, h=7, steps=[{"color": "blue", "value": None}], value_size=BIG,
+       desc=que("el total que entro al sistema; es el lado izquierdo de la ecuacion.", "Outbox transaccional: lo inyectado queda registrado antes de publicarse."))
+b.stat("Emitidas + rechazadas + en DLQ", CONT_Q + [expr("G", CONT_EXPR, "contabilizadas")],
+       calc="lastNotNull", w=5, h=7, steps=[{"color": "blue", "value": None}], value_size=BIG,
+       desc=que("debe igualar a las inyectadas: todo termino emitido, rechazado por negocio o apartado en DLQ.", "Conservacion de mensajes: at-least-once + DLQ, nada desaparece en silencio."))
+b.stat("SALDO (inyectadas - contabilizadas)", q_loss_balance(), calc="lastNotNull", w=6, h=7,
+       steps=[{"color": "green", "value": None}, {"color": "orange", "value": 1}], value_size=96,
+       desc=que("0 = cero perdida. Naranja mientras hay trabajo en vuelo; al terminar la corrida debe volver a 0 y quedarse verde.", "Verificacion de cero perdida (ASR de confiabilidad)."))
+b.stat("Ciclos y facturas reconciliados",
+       [m("A", NS, "CiclosCompletados", svc("ms-process-billing"), "Sum", 60, "ciclos completados"),
+        m("B", NS, "CiclosFallidos", svc("ms-process-billing"), "Sum", 60, "ciclos fallidos"),
+        m("C", NS, "CiclosReconciliados", svc("ms-process-billing"), "Sum", 60, "ciclos reconciliados"),
+        m("D", NS, "FacturasReconciliadas", svc("ms-process-billing"), "Sum", 60, "facturas reconciliadas")],
+       calc="sum", w=8, h=7, color_mode="value", steps=[{"color": "blue", "value": None}], value_size=44,
+       desc=que("'completados' sube al cerrar el ciclo; 'fallidos' debe ser 0; 'reconciliados' > 0 indica que se perdio un evento de estado y la reconciliacion contra DynamoDB cerro el ciclo (no se perdio la factura).",
+                "Reconciliacion (compensacion periodica) sobre un estado de ciclo basado en eventos best-effort."))
+b.ts("Conservacion en el tiempo: inyectadas vs contabilizadas",
+     CONT_Q + [expr("G", CONT_EXPR, "emitidas + rechazadas + DLQ", 60),
+               expr("H", "RUNNING_SUM(FILL(inj,0))", "inyectadas (acumulado)", 60)],
+     w=12, h=9, min_=0, ylab="Solicitudes acumuladas",
+     desc=que("las dos lineas se separan al inyectar y vuelven a juntarse; juntas = saldo 0. Una separacion que no cierra seria una perdida.",
+              "Durable messaging (Kafka/SQS) + outbox: el trabajo en vuelo es recuperable."))
+b.ts("Reintentos, duplicados descartados y replays",
+     [m("A", NS, "MensajesReenviados", svc("ms-process-billing"), "Sum", 60, "reenviados tras muerte del pod"),
+      m("B", NS, "MensajesDuplicados", svc("ms-process-billing"), "Sum", 60, "duplicados descartados en ingreso"),
+      m("C", NS, "IdempotenciaReplays", svc("ms-facturacion"), "Sum", 60, "replays idempotencia: facturacion"),
+      m("D", NS, "IdempotenciaReplays", svc("ms-comprobante-factura"), "Sum", 60, "replays idempotencia: comprobante"),
+      m("E", NS, "NotificacionesFallidas", svc("ms-comprobante-factura"), "Sum", 60, "notificaciones reintentadas")],
+     w=12, h=9, min_=0, ylab="Eventos por minuto",
+     desc=que("tras 'Fallo inyectado' aparecen reenvios y duplicados: el sistema entrega mas de una vez, pero las facturas emitidas no se duplican (el saldo sigue en 0).",
+              "Entrega at-least-once + consumidor idempotente (dedup en ingreso, Powertools idempotency en facturacion y comprobante)."))
+anno(b, "exp3")
 b.save("exp3-cero-perdida.json")
 
 # =========================================================== exp4

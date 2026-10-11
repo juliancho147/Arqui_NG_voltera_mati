@@ -32,18 +32,23 @@ def queue_total(st: dict) -> int:
     return st["visibles"] + st["enVuelo"] + st["demorados"]
 
 
-def peek_queue(ctx: Context, url: str, max_messages: int = 200, rounds: int = 6) -> list[dict]:
-    """Lee mensajes visibles SIN consumirlos (VisibilityTimeout=0), deduplicando por MessageId."""
+def peek_queue(ctx: Context, url: str, max_messages: int = 200, rounds: int | None = None, patience: int = 6) -> list[dict]:
+    """Lee mensajes visibles SIN consumirlos (VisibilityTimeout=0), deduplicando por MessageId.
+
+    SQS devuelve una muestra aleatoria: se sigue leyendo hasta `patience` rondas seguidas sin mensajes nuevos
+    (o `rounds`, por defecto proporcional a max_messages) para cubrir colas grandes (N de 500+)."""
     sqs = ctx.client("sqs")
     seen: dict[str, dict] = {}
+    rounds = rounds or max(6, -(-max_messages // 10) * 4)
+    idle = 0
     for _ in range(rounds):
         r = sqs.receive_message(QueueUrl=url, MaxNumberOfMessages=10, VisibilityTimeout=0, WaitTimeSeconds=0,
                                 MessageAttributeNames=["All"])
-        msgs = r.get("Messages", [])
-        new = [m for m in msgs if m["MessageId"] not in seen]
+        new = [m for m in r.get("Messages", []) if m["MessageId"] not in seen]
         for m in new:
             seen[m["MessageId"]] = m
-        if not new or len(seen) >= max_messages:
+        idle = 0 if new else idle + 1
+        if idle >= patience or len(seen) >= max_messages:
             break
     out = []
     for m in seen.values():
@@ -55,12 +60,22 @@ def peek_queue(ctx: Context, url: str, max_messages: int = 200, rounds: int = 6)
     return out
 
 
-def dlq_factura_ids(ctx: Context, queue_key: str, ciclo: str) -> tuple[set[str], int, list[dict]]:
-    """(facturaIds de este ciclo en la DLQ, total aproximado de mensajes en la DLQ, muestra de mensajes)."""
+def dlq_factura_ids(ctx: Context, queue_key: str, ciclo: str, expected: int = 0) -> tuple[set[str], int, list[dict]]:
+    """(facturaIds de este ciclo en la DLQ, total aproximado de mensajes en la DLQ, muestra de mensajes).
+    `expected` = N esperado: ajusta cuantos mensajes se intentan leer."""
     q = ctx.cfg.queue(queue_key)
-    msgs = peek_queue(ctx, q["dlq_url"])
+    msgs = peek_queue(ctx, q["dlq_url"], max_messages=max(200, expected + 50))
     ids = {m["body"].get("facturaId") for m in msgs if m["body"].get("cicloId") == ciclo and m["body"].get("facturaId")}
     return ids, queue_total(queue_state(ctx, q["dlq_url"])), msgs[:5]
+
+
+def dlq_covers(ids, dlq_ids: set[str], aprox: int, tolerance: float = 0.95) -> bool:
+    """True si todos los `ids` estan en la DLQ. Con N grande (>100) la lectura es una muestra: se acepta >= 95 % visto y
+    conteo aproximado de la DLQ >= N."""
+    ids = set(ids)
+    if ids <= dlq_ids:
+        return True
+    return len(ids) > 100 and aprox >= len(ids) and len(ids & dlq_ids) >= tolerance * len(ids)
 
 
 # ----------------------------------------------------------------------------- DynamoDB
@@ -225,8 +240,8 @@ def account(ctx: Context, ciclo: str, inyectadas: list[str] | None = None) -> Ac
     facts = fact_states(ctx, ciclo)
     acc.rechazadas = {f for f, e in facts.items() if e == "RECHAZADA"}
     acc.fallidas = {f for f, e in facts.items() if e == "FALLIDA"}
-    acc.dlq, acc.dlq_aprox, _ = dlq_factura_ids(ctx, "transacciones", ciclo)
-    acc.dlq_comprobantes, acc.dlq_comprobantes_aprox, _ = dlq_factura_ids(ctx, "comprobantes", ciclo)
+    acc.dlq, acc.dlq_aprox, _ = dlq_factura_ids(ctx, "transacciones", ciclo, len(acc.inyectadas))
+    acc.dlq_comprobantes, acc.dlq_comprobantes_aprox, _ = dlq_factura_ids(ctx, "comprobantes", ciclo, len(acc.inyectadas))
     acc.notificadas = set(comprobantes_notificados(ctx, ciclo))
     qt, qc = ctx.cfg.queue("transacciones"), ctx.cfg.queue("comprobantes")
     acc.colas = {"transacciones": queue_state(ctx, qt["url"]), "comprobantes": queue_state(ctx, qc["url"])}

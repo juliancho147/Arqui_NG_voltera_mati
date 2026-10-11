@@ -20,7 +20,17 @@ class Exp1(Experiment):
 
     @property
     def sla(self) -> float:
-        return float(self.ctx.opt("sla", self.cfg.param("batch_sla_seconds", 120)))
+        """SLA del lote: --sla explicito > --sla-per-msg (s por mensaje) > proporcional a N (--sla-scale, modo demo) > base del plan."""
+        opt = self.ctx.opt
+        if opt("sla") is not None:
+            return float(opt("sla"))
+        base = float(self.cfg.param("batch_sla_seconds", 120))
+        if opt("sla_per_msg") is not None:
+            return max(base, self.n * float(opt("sla_per_msg")))
+        if opt("sla_scale", False):
+            mx = max(1, int(self.cfg.param("process_billing_max", 5)))
+            return max(base, self.n * self.delay / mx * float(opt("sla_factor", 1.5)) + 60)
+        return base
 
     def plan(self) -> list[str]:
         c = self.cfg
@@ -46,11 +56,13 @@ class Exp1(Experiment):
     def execute(self, r: ExperimentResult) -> None:
         ctx, c = self.ctx, self.cfg
         mn, mx = int(c.param("process_billing_min", 1)), int(c.param("process_billing_max", 5))
+        ctx.phase("estado_inicial", f"Replicas base de {c.deployment} (esperado {mn}), lag 0, DLQ vacia")
         r.params.update({"retardoSegundos": self.delay, "slaSegundos": self.sla, "replicasMin": mn, "replicasMax": mx})
         base = ctx.kube.deployment_status(c.app_namespace, c.deployment)
         group = self._group(base["raw"])
         r.data["replicasIniciales"] = {k: base[k] for k in ("spec", "replicas", "ready")}
 
+        ctx.phase("disparo", f"Seed de {self.n} transacciones + evento CierreDeMes (retardo {self.delay} s/mensaje, SLA {self.sla:.0f} s)")
         d = actions.dispatch_cierre(ctx, self.ciclo_id, self.n, retardo_segundos=self.delay)
         t0, ids = d["t0"], d["facturaIds"]
         series: list[dict] = []
@@ -75,6 +87,7 @@ class Exp1(Experiment):
             return s["terminadas"] >= self.n or s["dlq"] > 0 and s["terminadas"] + s["dlq"] >= self.n
 
         timeout = float(ctx.opt("timeout", max(self.sla * 3, 300)))
+        ctx.phase("absorcion", "KEDA escala segun el lag; se drena el backlog. Observe replicas, lag y facturas terminadas")
         ok, _ = ctx.wait_until(done, timeout, ctx.opt("poll", 5))
         t_batch = ctx.clock() - t0 if ok else None
 
@@ -83,6 +96,8 @@ class Exp1(Experiment):
 
         # --- bajada de replicas
         if not ctx.opt("skip_scaledown", False):
+            ctx.phase("recuperacion", "Backlog drenado: las replicas deben volver al minimo sin intervencion manual")
+
             def down() -> bool:
                 st = ctx.kube.deployment_status(c.app_namespace, c.deployment)
                 series.append({"t": round(ctx.clock() - t0, 1), "replicas": st["replicas"], "ready": st["ready"], "desired": None,
@@ -92,6 +107,7 @@ class Exp1(Experiment):
         else:
             scaled_down = None
         r.data["serie"] = series
+        r.data["slaSegundos"] = self.sla
 
         r.add("E1.1", "El lote completo termina (todas las facturas llegan a estado terminal)", bool(ok) and len(acc.faltantes) == 0,
               f"{self.n} FACT# terminales", f"{len(evidence.fact_states(ctx, self.ciclo_id))} terminales; faltantes={fmt_ids(acc.faltantes)}",

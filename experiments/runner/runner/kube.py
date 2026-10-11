@@ -31,10 +31,18 @@ class Kube:
         self.runner = runner or subprocess_runner
         self.context = context
         self.calls: list[list[str]] = []
+        self.echo: Callable[[str], None] | None = None  # modo demo
+        self._echoed: set[str] = set()
 
     def run(self, args: list[str], timeout: float = 60, check: bool = True) -> KubeResult:
         full = (["--context", self.context] if self.context else []) + list(args)
         self.calls.append(full)
+        if self.echo:
+            line = "kubectl " + " ".join(full)
+            mutating = bool(args) and args[0] in ("delete", "apply", "scale", "patch", "rollout", "set", "annotate", "label")
+            if mutating or line not in self._echoed:
+                self._echoed.add(line)
+                self.echo(line + ("" if mutating else "   (lectura; se repite cada ciclo de muestreo)"))
         res = self.runner(full, timeout)
         if check and res.returncode != 0:
             raise KubeError(f"kubectl {' '.join(full[:6])} fallo ({res.returncode}): {res.stderr.strip()[:300]}")

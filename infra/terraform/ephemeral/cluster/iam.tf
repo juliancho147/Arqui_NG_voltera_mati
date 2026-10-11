@@ -74,6 +74,13 @@ resource "aws_iam_role_policy" "process_billing" {
         Resource = [local.process_billing_table_arn]
       },
       {
+        # Reconciliacion del ciclo: Scan de solo lectura sobre la idempotencia de ms-comprobante-factura (sin escritura).
+        Sid      = "ReconciliacionLecturaIdemComprobante"
+        Effect   = "Allow"
+        Action   = ["dynamodb:Scan"]
+        Resource = [local.idem_comprobante_table_arn]
+      },
+      {
         Sid      = "PublicarEnColaDeTransacciones"
         Effect   = "Allow"
         Action   = ["sqs:SendMessage", "sqs:GetQueueAttributes", "sqs:GetQueueUrl"]

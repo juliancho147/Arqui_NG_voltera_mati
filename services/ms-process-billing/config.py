@@ -20,6 +20,9 @@ class Settings:
     ttl_attr: str = "expiresAt"
     poll_timeout: float = 1.0
     service: str = "ms-process-billing"
+    table_reconciliacion: str = ""   # idem-comprobante (solo lectura); vacio = reconciliacion desactivada
+    reconcile_after_seconds: int = 45
+    consumer_concurrency: int = 1
 
     @property
     def group_eventos(self) -> str:
@@ -40,4 +43,7 @@ class Settings:
             health_port=int(e.get("HEALTH_PORT", "8080")),
             ciclo_timeout_seconds=int(e.get("CICLO_TIMEOUT_SECONDS", "600")),
             ttl_attr=e.get("IDEMPOTENCY_TTL_ATTR", "expiresAt"),
+            table_reconciliacion=e.get("TABLE_RECONCILIACION", ""),
+            reconcile_after_seconds=int(e.get("RECONCILE_AFTER_SECONDS", "45") or 45),
+            consumer_concurrency=max(1, int(e.get("CONSUMER_CONCURRENCY", "1") or 1)),
         )

@@ -17,6 +17,7 @@ variable "base_overrides" {
     ecr_repository_url      = optional(string)
     transactions_queue_url  = optional(string)
     process_billing_table   = optional(string)
+    idem_comprobante_table  = optional(string)
     keda_lag_threshold      = optional(number)
     process_billing_min     = optional(number)
     process_billing_max     = optional(number)
@@ -190,4 +191,20 @@ variable "cloudwatch_namespace" {
 variable "metrics_flush_seconds" {
   type    = number
   default = 10
+}
+
+variable "reconcile_after_seconds" {
+  description = "Segundos sin avance antes de reconciliar un ciclo EN_CURSO contra idem-comprobante (RECONCILE_AFTER_SECONDS)."
+  type        = number
+  default     = 45
+}
+
+variable "consumer_concurrency" {
+  description = "Mensajes procesados en paralelo por pod (CONSUMER_CONCURRENCY). 1 = comportamiento secuencial original; >1 oculta parcialmente el efecto del escalado de KEDA (Exp. 1)."
+  type        = number
+  default     = 1
+  validation {
+    condition     = var.consumer_concurrency >= 1 && floor(var.consumer_concurrency) == var.consumer_concurrency
+    error_message = "consumer_concurrency debe ser un entero >= 1."
+  }
 }

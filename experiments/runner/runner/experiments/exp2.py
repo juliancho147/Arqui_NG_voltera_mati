@@ -84,19 +84,30 @@ class Exp2(Experiment):
         ids: list[str] = []
         journal_ids: list[str] = []
         mr = int(c.param("max_receive_count", 3))
-        timeout = float(ctx.opt("timeout", 300 if tag == "A" else mr * self._vis() + 240))
+        timeout = float(ctx.opt("timeout", self.scale_time(300 if tag == "A" else mr * self._vis() + 240)))
         poll = ctx.opt("poll", 5)
         pre = f"E2.{tag}"
+        serie: list[dict] = []
+        r.data[f"serie{tag}"] = serie
         try:
+            ctx.phase("estado_inicial", f"Caso {tag} ({cs['label']}): todo sano, colas y DLQ en 0")
+            self._watch(serie, ciclo, 0.0, tag)()
+            ctx.phase("fallo_inyectado", f"Se degrada {service} ({'FORCE_FAIL=true' if self.mode == 'env' else 'concurrencia reservada 0'}); el resto de servicios sigue en linea")
             journal_ids.append(actions.inject_fault(ctx, service, self.mode))
+            ctx.phase("disparo", f"{n} transacciones entran por el cierre de mes con {service} caido")
             d = actions.dispatch_cierre(ctx, ciclo, n)
             ids, t0 = d["facturaIds"], d["t0"]
+            tick = self._watch(serie, ciclo, t0, tag)
+            ctx.phase("acumulacion", "Los mensajes afectados se reintentan y se acumulan en la DLQ; el flujo restante sigue. Observe cola/DLQ" )
 
             if tag == "A":
-                dlq_ok, _ = ctx.wait_until(lambda: len(evidence.dlq_factura_ids(ctx, "transacciones", ciclo)[0]) >= n, timeout, poll)
-                dlq_ids, dlq_aprox, muestra = evidence.dlq_factura_ids(ctx, "transacciones", ciclo)
+                def in_dlq_a() -> bool:
+                    i, a, _ = evidence.dlq_factura_ids(ctx, "transacciones", ciclo, n)
+                    return evidence.dlq_covers(ids, i, a)
+                dlq_ok, _ = ctx.wait_until(in_dlq_a, timeout, poll, on_tick=tick)
+                dlq_ids, dlq_aprox, muestra = evidence.dlq_factura_ids(ctx, "transacciones", ciclo, n)
                 r.add(f"{pre}.1", f"Con {service} caido, las {n} transacciones afectadas llegan a la DLQ de transacciones",
-                      set(ids) <= dlq_ids, f"{n} en DLQ", f"{len(dlq_ids)} en DLQ ({dlq_aprox} aprox. total)", dlq=fmt_ids(dlq_ids), muestra=muestra)
+                      evidence.dlq_covers(ids, dlq_ids, dlq_aprox), f"{n} en DLQ", f"{len(dlq_ids)} en DLQ ({dlq_aprox} aprox. total)", dlq=fmt_ids(dlq_ids), muestra=muestra)
                 # reintentos con backoff (Step Functions)
                 try:
                     sfn = evidence.sfn_failed_attempts(ctx, t0 - 5)
@@ -112,14 +123,17 @@ class Exp2(Experiment):
                 r.add(f"{pre}.3", "El resto del flujo no avanza a facturas con el dependiente caido (sin emisiones parciales erroneas)",
                       len(acc.emitidas) == 0, "0 emitidas mientras tarifas esta caido", f"{len(acc.emitidas)} emitidas")
             else:
-                ok, _ = ctx.wait_until(lambda: len(evidence.account(ctx, ciclo, ids).emitidas) >= n, timeout, poll)
+                ok, _ = ctx.wait_until(lambda: len(evidence.facturas_emitidas(ctx, ciclo)) >= n, timeout, poll, on_tick=tick)
                 acc = evidence.account(ctx, ciclo, ids)
                 r.add(f"{pre}.1", "Flujo principal intacto (bulkhead): las facturas se emiten aunque el comprobante este caido",
                       len(acc.emitidas) == n, f"{n} emitidas", f"{len(acc.emitidas)} emitidas", emitidas=fmt_ids(acc.emitidas))
-                dlq_ok, _ = ctx.wait_until(lambda: len(evidence.dlq_factura_ids(ctx, "comprobantes", ciclo)[0]) >= n, timeout, poll)
-                dlq_ids, dlq_aprox, muestra = evidence.dlq_factura_ids(ctx, "comprobantes", ciclo)
+                def in_dlq_b() -> bool:
+                    i, a, _ = evidence.dlq_factura_ids(ctx, "comprobantes", ciclo, n)
+                    return evidence.dlq_covers(ids, i, a)
+                dlq_ok, _ = ctx.wait_until(in_dlq_b, timeout, poll, on_tick=tick)
+                dlq_ids, dlq_aprox, muestra = evidence.dlq_factura_ids(ctx, "comprobantes", ciclo, n)
                 r.add(f"{pre}.2", f"Tras {mr} entregas fallidas, los {n} comprobantes caen a la DLQ de comprobantes",
-                      set(ids) <= dlq_ids, f"{n} en DLQ", f"{len(dlq_ids)} en DLQ ({dlq_aprox} aprox.)", dlq=fmt_ids(dlq_ids), muestra=muestra,
+                      evidence.dlq_covers(ids, dlq_ids, dlq_aprox), f"{n} en DLQ", f"{len(dlq_ids)} en DLQ ({dlq_aprox} aprox.)", dlq=fmt_ids(dlq_ids), muestra=muestra,
                       visibilityTimeout=self._vis(), maxReceiveCount=mr)
                 fallidas = {f for f, e in evidence.fact_states(ctx, ciclo).items() if e == "FALLIDA"}
                 r.add(f"{pre}.3", "process-billing registra las notificaciones definitivamente fallidas (FACT# FALLIDA)",
@@ -134,6 +148,7 @@ class Exp2(Experiment):
                   deploy={k: st[k] for k in ("spec", "replicas", "ready")})
             r.add(f"{pre}.5", "Endpoint de salud dummy (servicios 'en linea'): /healthz de ms-process-billing responde", self._health(),
                   "HTTP 200 via proxy del API server", "ver evidencia")
+            ctx.phase("recuperacion", f"Se restaura {service} (se revierte el fallo) y se reprocesa la DLQ (redrive); observe como drena")
         finally:
             restored = actions.restore_ids(ctx, journal_ids)
         pending = [e for e in ctx.journal.pending() if e["id"] in journal_ids]
@@ -143,14 +158,14 @@ class Exp2(Experiment):
             return
 
         # recuperacion: redrive de la DLQ
-        red = actions.redrive_dlq(ctx, cs["dlq"])
+        red = actions.redrive_dlq(ctx, cs["dlq"], timeout=self.scale_time(120, 0.5))
         ctx.log(f"redrive {cs['dlq']}: {red}")
 
         def recovered() -> bool:
             a = evidence.account(ctx, ciclo, ids)
             return (len(a.emitidas) + len(a.rechazadas) >= n and len(a.notificadas) >= len(a.emitidas)
                     and a.dlq_aprox == 0 and a.dlq_comprobantes_aprox == 0)
-        ok, secs = ctx.wait_until(recovered, float(ctx.opt("timeout_recovery", 300)), poll)
+        ok, secs = ctx.wait_until(recovered, float(ctx.opt("timeout_recovery", self.scale_time(300, 3))), poll, on_tick=tick)
         acc = evidence.account(ctx, ciclo, ids)
         meta = evidence.ciclo_meta(ctx, ciclo)
         facts = evidence.fact_states(ctx, ciclo)
@@ -164,6 +179,27 @@ class Exp2(Experiment):
         r.add(f"{pre}.9", "Estado del ciclo consistente tras la recuperacion (FACT# OK y META COMPLETADO)",
               oks == n and meta.get("estado") == "COMPLETADO", f"{n} OK y COMPLETADO", f"{oks} OK, estado {meta.get('estado')}", meta=meta,
               duplicadas=acc.emitidas_duplicadas)
+
+    def _watch(self, serie: list[dict], ciclo: str, t0: float, tag: str):
+        """Devuelve un callback que muestrea y muestra colas/DLQ/emitidas (para ver la DLQ acumularse y drenar)."""
+        ctx, c = self.ctx, self.cfg
+
+        def tick() -> None:
+            try:
+                qt, qc = c.queue("transacciones"), c.queue("comprobantes")
+                s = {"t": round(max(0.0, ctx.clock() - t0), 1) if t0 else 0.0,
+                     "emitidas": len(evidence.facturas_emitidas(ctx, ciclo)),
+                     "colaTx": evidence.queue_total(evidence.queue_state(ctx, qt["url"])),
+                     "dlqTx": evidence.queue_total(evidence.queue_state(ctx, qt["dlq_url"])),
+                     "colaComp": evidence.queue_total(evidence.queue_state(ctx, qc["url"])),
+                     "dlqComp": evidence.queue_total(evidence.queue_state(ctx, qc["dlq_url"]))}
+            except Exception as exc:  # noqa: BLE001 - la observacion nunca debe romper el experimento
+                ctx.log(f"aviso: no se pudo muestrear colas ({type(exc).__name__})")
+                return
+            serie.append(s)
+            ctx.log(f"[{tag}] t={s['t']}s emitidas={s['emitidas']}/{self.n} cola-tx={s['colaTx']} DLQ-tx={s['dlqTx']} "
+                    f"cola-comp={s['colaComp']} DLQ-comp={s['dlqComp']}")
+        return tick
 
     def _health(self) -> bool | None:
         c = self.cfg

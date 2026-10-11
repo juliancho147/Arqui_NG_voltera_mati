@@ -1,4 +1,4 @@
-"""CLI: python -m runner exp1|exp2|exp3|exp4|all|restore [opciones]."""
+"""CLI: python -m runner exp1|exp2|exp3|exp4|all|restore|demo <exp> [opciones]."""
 from __future__ import annotations
 
 import argparse
@@ -8,11 +8,13 @@ from pathlib import Path
 from . import actions
 from .config import REPORTS_DIR, ConfigError, load_config
 from .context import Context
+from .demo import Grafana, apply_demo_defaults, run_demo
 from .experiments.exp1 import Exp1
 from .experiments.exp2 import Exp2
 from .experiments.exp3 import Exp3
 from .experiments.exp4 import Exp4
 from .report import write_report
+from .resultados import RESULTADOS_PATH
 from .safety import Aborted, SafetyError
 
 EXPERIMENTS = {"exp1": Exp1, "exp2": Exp2, "exp3": Exp3, "exp4": Exp4}
@@ -44,11 +46,27 @@ def build_parser() -> argparse.ArgumentParser:
     t.add_argument("--graceful", action="store_true", help="exp3: apagado ordenado del pod en vez de --force --grace-period=0")
     t.add_argument("--no-dispatch", action="store_true", help="exp4: auditar un ciclo ya ejecutado")
     t.add_argument("--asyncapi", default=None)
+    t.add_argument("--sla-per-msg", dest="sla_per_msg", type=float, default=None, help="exp1: SLA = max(base, N x este valor en s/mensaje)")
+    t.add_argument("--sla-factor", dest="sla_factor", type=float, default=None, help="exp1 con --sla-scale/demo: holgura sobre el ideal N*delay/replicas_max (1.5)")
+    t.add_argument("--sla-scale", dest="sla_scale", action="store_true", help="exp1: SLA proporcional a N (siempre activo en demo)")
+    t.add_argument("--time-per-msg", dest="time_per_msg", type=float, default=None, help="segundos extra de timeout por mensaje sobre 10 (exp2/exp3)")
+    t.add_argument("--fail-rate", dest="fail_rate", type=float, default=None, help="exp3: FAIL_RATE (0..1) en ms-facturacion durante el pico (0 = sin fallo parcial; defecto 0.25)")
+    t.add_argument("--kill-pods", dest="kill_pods", type=int, default=None, help="exp3: cuantos pods de process-billing matar (defecto 1)")
+
+    d = argparse.ArgumentParser(add_help=False)
+    dg = d.add_argument_group("demo")
+    dg.add_argument("--no-pause", action="store_true", help="demo: sin pausas interactivas")
+    dg.add_argument("--no-grafana", action="store_true", help="demo: no escribir anotaciones en Grafana")
+    dg.add_argument("--grafana-url", default=None, help="demo: URL de Grafana (var GRAFANA_URL; defecto http://localhost:3000). Credenciales: GRAFANA_TOKEN o GRAFANA_USER/GRAFANA_PASSWORD")
+    dg.add_argument("--resultados", default=None, help="demo: ruta de RESULTADOS.md (defecto experiments/RESULTADOS.md)")
+    dg.add_argument("--no-resultados", action="store_true", help="demo: no modificar RESULTADOS.md")
 
     p = argparse.ArgumentParser(prog="python -m runner", description="Runner de la experimentacion 2 de Voltera.")
     sub = p.add_subparsers(dest="cmd", required=True)
     for name, cls in EXPERIMENTS.items():
         sub.add_parser(name, parents=[common], help=cls.title)
+    dm = sub.add_parser("demo", parents=[common, d], help="modo demo para grabar UN experimento: pausas, banners, marcas y RESULTADOS.md")
+    dm.add_argument("exp", choices=["exp1", "exp2", "exp3"])
     sub.add_parser("all", parents=[common], help="exp1 a exp4 en orden")
     rs = sub.add_parser("restore", parents=[common], help="revierte los cambios pendientes de la bitacora (fallos inyectados)")
     rs.add_argument("--list", action="store_true", help="solo listar los cambios registrados")
@@ -57,8 +75,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _options(a) -> dict:
     keys = ["delay", "sla", "fault_mode", "case", "timeout", "poll", "scaledown_timeout", "skip_scaledown", "fault_window",
-            "graceful", "no_dispatch", "asyncapi"]
-    return {k: getattr(a, k) for k in keys if getattr(a, k, None) not in (None, False)}
+            "graceful", "no_dispatch", "asyncapi", "sla_per_msg", "sla_factor", "sla_scale", "time_per_msg", "fail_rate", "kill_pods"]
+    return {k: getattr(a, k) for k in keys if getattr(a, k, None) is not None and getattr(a, k, None) is not False}
 
 
 def make_context(a, **kw) -> Context:
@@ -103,6 +121,17 @@ def main(argv: list[str] | None = None, *, ctx_factory=None) -> int:
     names = list(EXPERIMENTS) if a.cmd == "all" else [a.cmd]
     n = a.n or ctx.cfg.n_default
     base_ciclo = a.ciclo_id or actions.new_ciclo_id()
+    if a.cmd == "demo":
+        if a.dry_run:
+            print(f"# DRY-RUN demo: N={n}")
+            apply_demo_defaults(ctx, a.exp)
+            exp = EXPERIMENTS[a.exp](ctx, n, base_ciclo)
+            for i, s in enumerate(exp.plan(), 1):
+                print(f"{i:>2}. {s}")
+            return 0
+        res_path = None if a.no_resultados else (a.resultados or RESULTADOS_PATH)
+        return run_demo(ctx, a.exp, n, base_ciclo, EXPERIMENTS, pause=not a.no_pause,
+                        grafana=Grafana(a.grafana_url, enabled=not a.no_grafana), resultados=res_path)
     if a.dry_run:
         print(f"# DRY-RUN: no se llama a AWS ni a kubectl (config {'por defecto' if ctx.cfg.placeholder else 'cargada'}, "
               f"region {ctx.cfg.region}, prefijo {ctx.cfg.prefix}, N={n})")

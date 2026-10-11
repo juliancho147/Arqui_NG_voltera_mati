@@ -18,6 +18,7 @@
   },
   "timepicker": {
     "refresh_intervals": [
+      "5s",
       "10s",
       "30s",
       "1m",
@@ -1300,6 +1301,80 @@
     {
       "id": 15,
       "type": "stat",
+      "title": "Ciclos reconciliados",
+      "description": "Ciclos cerrados por reconciliacion contra DynamoDB (evento de estado perdido).",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 14
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "CiclosReconciliados",
+          "dimensions": {
+            "service": "ms-process-billing"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "",
+          "expression": "",
+          "label": "CiclosReconciliados",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "sum"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "center"
+      }
+    },
+    {
+      "id": 16,
+      "type": "stat",
       "title": "Fallos de publicacion al mesh",
       "description": "",
       "datasource": {
@@ -1309,7 +1384,7 @@
       "gridPos": {
         "h": 4,
         "w": 4,
-        "x": 12,
+        "x": 16,
         "y": 14
       },
       "targets": [
@@ -1374,7 +1449,7 @@
       }
     },
     {
-      "id": 16,
+      "id": 17,
       "type": "stat",
       "title": "Health ms-process-billing",
       "description": "",
@@ -1385,7 +1460,7 @@
       "gridPos": {
         "h": 4,
         "w": 4,
-        "x": 16,
+        "x": 20,
         "y": 14
       },
       "targets": [
@@ -1450,7 +1525,7 @@
       }
     },
     {
-      "id": 17,
+      "id": 18,
       "type": "row",
       "title": "Colas y cómputo",
       "collapsed": false,
@@ -1463,7 +1538,7 @@
       "panels": []
     },
     {
-      "id": 18,
+      "id": 19,
       "type": "timeseries",
       "title": "Cola de transacciones  (eje X: hora)",
       "description": "Eje Y: Mensajes en cola. Eje X: tiempo (hora local).",
@@ -1559,7 +1634,7 @@
       }
     },
     {
-      "id": 19,
+      "id": 20,
       "type": "timeseries",
       "title": "Replicas ms-process-billing  (eje X: hora)",
       "description": "Container Insights (add-on amazon-cloudwatch-observability). KEDA 1..5. Eje Y: Réplicas (pods). Eje X: tiempo (hora local).",
@@ -1635,7 +1710,7 @@
       }
     },
     {
-      "id": 20,
+      "id": 21,
       "type": "timeseries",
       "title": "Ejecuciones Step Functions  (eje X: hora)",
       "description": "Eje Y: Ejecuciones por minuto. Eje X: tiempo (hora local).",
@@ -1754,7 +1829,7 @@
       }
     },
     {
-      "id": 21,
+      "id": 22,
       "type": "row",
       "title": "Salud",
       "collapsed": false,
@@ -1767,7 +1842,7 @@
       "panels": []
     },
     {
-      "id": 22,
+      "id": 23,
       "type": "timeseries",
       "title": "Errores por Lambda  (eje X: hora)",
       "description": "Eje Y: Errores por minuto. Eje X: tiempo (hora local).",
@@ -1838,7 +1913,7 @@
       }
     },
     {
-      "id": 23,
+      "id": 24,
       "type": "timeseries",
       "title": "Throttles por Lambda  (eje X: hora)",
       "description": "Eje Y: Throttles por minuto. Eje X: tiempo (hora local).",
@@ -1909,7 +1984,7 @@
       }
     },
     {
-      "id": 24,
+      "id": 25,
       "type": "table",
       "title": "Ultimos eventos del ciclo (logs estructurados)",
       "description": "Logs Insights sobre los logs JSON de Powertools (campos cicloId/facturaId).",

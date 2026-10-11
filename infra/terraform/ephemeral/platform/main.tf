@@ -19,6 +19,7 @@ locals {
 
   ecr_repository_url     = try(coalesce(local.bo.ecr_repository_url, try(local.base.ecr_process_billing.repository_url, null)), null)
   transactions_queue_url = try(coalesce(local.bo.transactions_queue_url, try(local.base.sqs.transacciones.url, null)), null)
+  idem_comprobante_table = try(coalesce(local.bo.idem_comprobante_table, try(local.base.dynamodb_tables.names["idem-comprobante"], null)), null)
   process_billing_table  = try(coalesce(local.bo.process_billing_table, try(local.base.dynamodb_tables.names["process-billing"], null)), null)
 
   # Parámetros del experimento (salen del stack base para que haya una sola fuente de verdad).

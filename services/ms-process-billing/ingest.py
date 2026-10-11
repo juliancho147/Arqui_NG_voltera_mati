@@ -25,7 +25,16 @@ class IngestProcessor:
         self.stop = stop or threading.Event()
         self.metrics, self.logger = metrics, logger
         self.counters = {"enviados": 0, "duplicados": 0, "reenviados": 0}
-        self.last_timings: dict = {}
+        self._tl = threading.local()  # tiempos por hilo (con CONSUMER_CONCURRENCY>1 hay varios mensajes a la vez)
+        self._lock = threading.Lock()
+
+    @property
+    def last_timings(self) -> dict:
+        return getattr(self._tl, "t", {})
+
+    @last_timings.setter
+    def last_timings(self, v: dict) -> None:
+        self._tl.t = v
 
     def _metric(self, name: str) -> None:
         if self.metrics is not None:
@@ -67,7 +76,8 @@ class IngestProcessor:
         t["claimMs"] = (perf_counter() - t0) * 1000
         self.last_timings.update(t, veredicto=verdict)
         if verdict == "DUPLICADO":
-            self.counters["duplicados"] += 1
+            with self._lock:
+                self.counters["duplicados"] += 1
             self._metric("MensajesDuplicados")
             self._log("mensaje duplicado descartado", cicloId=ciclo, facturaId=factura)
             return verdict
@@ -94,7 +104,8 @@ class IngestProcessor:
         t["updateMs"] = (perf_counter() - t0) * 1000
         self.last_timings.update(t)
         key = "reenviados" if verdict == "REENVIAR" else "enviados"
-        self.counters[key] += 1
+        with self._lock:
+            self.counters[key] += 1
         self._metric("TransaccionesEnviadasASqs")
         if verdict == "REENVIAR":
             self._metric("MensajesReenviados")

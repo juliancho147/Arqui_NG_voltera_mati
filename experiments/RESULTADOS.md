@@ -1,5 +1,16 @@
 # Bitácora de pruebas — Experimentación 2 (facturación dirigida por eventos)
 
+> **Segunda tanda (grabación de Exp. 1, 2 y 3):** los registros nuevos se agregan abajo, en "Tanda de grabación". La sesión del 2026-10-10 se conserva más abajo como **sesión de diagnóstico** (referencia: arrancó con el rendimiento de 1,1 mensajes/s y el evento de estado perdido).
+
+## Tanda de grabación
+
+_(sin registros todavía; el modo demo del runner agrega cada prueba aquí automáticamente)_
+
+---
+
+# Sesión de diagnóstico (2026-10-10)
+
+
 > Un registro por cada prueba ejecutada, en orden cronológico. Los reportes crudos del runner están en `experiments/reports/<fecha-hora>-<exp>/report.{md,json}`; aquí se guarda el resumen, los parámetros, los datos medidos y lo aprendido.
 > Zona horaria de las horas: America/Bogota (UTC−5). Región AWS: us-east-1.
 

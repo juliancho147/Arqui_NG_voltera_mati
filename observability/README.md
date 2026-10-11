@@ -42,6 +42,11 @@ Opcional: `AWS_CREDENTIALS_FILE=/ruta/otro/archivo` en `.env`.
 - Saldo de conservación = `RUNNING_SUM(inyectadas) - RUNNING_SUM(emitidas) - rechazos de negocio - DLQ(transacciones)`; es positivo mientras hay trabajo en vuelo y debe quedar en 0 al finalizar.
 - Ya no quedan paneles `[PENDIENTE]`; si aparece alguno en el futuro cita su incidencia (OBS-n) en `ORQUESTACION.md`.
 
+## Dashboards para grabar (exp1, exp2, exp3)
+- ~6 paneles cada uno, fila superior de stats con fuente grande, refresh 5 s y rango 15 min. Cada panel trae en su descripción "Qué mirar" y "Patrón de arquitectura". Guion de exposición en `GUION-EXPOSICION.md`.
+- Anotaciones: métrica `FaseExperimento` (namespace `Voltera/Exp2`, dims `experimento`=`exp1|exp2|exp3`, `fase`=`pico_inyectado|fallo_inyectado|recuperacion`, valor 1) que publica el runner. El datasource CloudWatch de Grafana no admite anotaciones por métrica, así que se leen del resultado de los paneles de la fila final "Fuente de anotaciones" (datasource `-- Dashboard --`). Sin verificar en Grafana real.
+- Nuevas métricas (ms-process-billing): `CiclosReconciliados`, `FacturasReconciliadas`. Lag: `KafkaConsumerLag` Sum/6.
+
 ## Métricas y campos usados
 - `Voltera/Exp2` (dim `service`): `UnidadesEnOutbox`, `EventosPublicadosOutbox`, `TarifasValidadas/Rechazadas`, `CargosCalculados`, `CalculosRechazados`, `FacturasEmitidas`, `EmisionesRechazadas`, `FacturasNotificadas`, `NotificacionesFallidas`, `TransaccionesEnviadasASqs`, `MensajesDuplicados` (volcado cada 10 s), `MeshPublishFailures`, `MensajesReenviados`, `MensajesProcesadosPorPod` y `HealthCheckOk` (dims `service`+`pod`), `IdempotenciaReplays`, `CiclosCompletados`, `CiclosFallidos`, `CicloDuracionSegundos`.
 - Exp1: `KafkaConsumerLag` (dims `service`, `topic`; Sum) y `MensajeTotalMs`/`MensajeSobrecostoMs` (dim `service`).

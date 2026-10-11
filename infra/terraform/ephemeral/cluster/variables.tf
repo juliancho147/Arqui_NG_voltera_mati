@@ -27,8 +27,9 @@ variable "base_state_path" {
 variable "base_overrides" {
   description = "Valores del stack base si no se lee su estado (o para sobreescribirlos)."
   type = object({
-    process_billing_table_arn = optional(string)
-    transactions_queue_arn    = optional(string)
+    process_billing_table_arn  = optional(string)
+    transactions_queue_arn     = optional(string)
+    idem_comprobante_table_arn = optional(string)
   })
   default = {}
 }
