@@ -1,0 +1,23 @@
+apiVersion: 1
+datasources:
+  - name: CloudWatch
+    uid: cloudwatch
+    type: cloudwatch
+    access: proxy
+    isDefault: true
+    editable: false
+    jsonData:
+      authType: credentials          # cadena estandar de credenciales: AWS_SHARED_CREDENTIALS_FILE + AWS_PROFILE
+      profile: ${AWS_PROFILE}
+      defaultRegion: ${AWS_REGION}
+      customMetricsNamespaces: Voltera/Exp2,ContainerInsights
+
+  - name: X-Ray
+    uid: xray
+    type: grafana-x-ray-datasource
+    access: proxy
+    editable: false
+    jsonData:
+      authType: credentials
+      profile: ${AWS_PROFILE}
+      defaultRegion: ${AWS_REGION}

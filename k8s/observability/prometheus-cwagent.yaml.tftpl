@@ -1,0 +1,118 @@
+# Agente CloudWatch dedicado a scrapear Prometheus (kafka-exporter) y publicar métricas EMF en CloudWatch.
+# Métrica final: namespace ContainerInsights/Prometheus, nombre kafka_consumergroup_lag_sum,
+# dimensiones ClusterName + consumergroup + topic. Credenciales por EKS Pod Identity (SA cwagent-prometheus).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cwagent-prometheus
+  namespace: ${namespace}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cwagent-prometheus
+rules:
+  - apiGroups: [""]
+    resources: [pods, nodes, endpoints, services]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cwagent-prometheus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cwagent-prometheus
+subjects:
+  - kind: ServiceAccount
+    name: cwagent-prometheus
+    namespace: ${namespace}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cwagent-prometheus-config
+  namespace: ${namespace}
+data:
+  cwagentconfig.json: |
+    {
+      "agent": { "debug": false },
+      "logs": {
+        "metrics_collected": {
+          "prometheus": {
+            "prometheus_config_path": "/etc/prometheusconfig/prometheus.yaml",
+            "log_group_name": "/aws/containerinsights/${cluster_name}/prometheus",
+            "cluster_name": "${cluster_name}",
+            "emf_processor": {
+              "metric_declaration": [
+                {
+                  "source_labels": ["job"],
+                  "label_matcher": "^kafka-exporter$",
+                  "dimensions": [["ClusterName", "consumergroup", "topic"]],
+                  "metric_selectors": ["^kafka_consumergroup_lag_sum$"]
+                }
+              ]
+            }
+          }
+        },
+        "force_flush_interval": 5
+      }
+    }
+  prometheus.yaml: |
+    global:
+      scrape_interval: 15s
+      scrape_timeout: 10s
+    scrape_configs:
+      - job_name: kafka-exporter
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names: [${kafka_namespace}]
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_strimzi_io_cluster, __meta_kubernetes_pod_label_strimzi_io_component_type]
+            action: keep
+            regex: billing;kafka-exporter
+          - source_labels: [__meta_kubernetes_pod_ip]
+            target_label: __address__
+            replacement: $1:9404
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cwagent-prometheus
+  namespace: ${namespace}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cwagent-prometheus
+  template:
+    metadata:
+      labels:
+        app: cwagent-prometheus
+    spec:
+      serviceAccountName: cwagent-prometheus
+      containers:
+        - name: cwagent
+          image: ${image}
+          env:
+            - name: CI_VERSION
+              value: "k8s/1.3.0"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 100Mi
+            limits:
+              memory: 200Mi
+          volumeMounts:
+            - name: config
+              mountPath: /etc/cwagentconfig/cwagentconfig.json
+              subPath: cwagentconfig.json
+            - name: config
+              mountPath: /etc/prometheusconfig/prometheus.yaml
+              subPath: prometheus.yaml
+      volumes:
+        - name: config
+          configMap:
+            name: cwagent-prometheus-config

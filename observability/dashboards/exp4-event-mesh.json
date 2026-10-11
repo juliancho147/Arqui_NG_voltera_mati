@@ -1,0 +1,1598 @@
+{
+  "uid": "voltera-exp4-event-mesh",
+  "title": "Exp4 - Event Mesh (observabilidad y contexto)",
+  "description": "Completitud de eventos, fallos de publicacion, linea de tiempo por factura, estado del ciclo y trazas.",
+  "tags": [
+    "voltera",
+    "exp2",
+    "exp4"
+  ],
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "graphTooltip": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "10s",
+      "30s",
+      "1m",
+      "5m"
+    ]
+  },
+  "timezone": "browser",
+  "fiscalYearStartMonth": 0,
+  "liveNow": false,
+  "templating": {
+    "list": [
+      {
+        "type": "textbox",
+        "name": "cicloId",
+        "label": "cicloId",
+        "query": ".",
+        "current": {
+          "text": ".",
+          "value": "."
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": ".",
+            "value": "."
+          }
+        ],
+        "description": "Regex sobre cicloId para Logs Insights; '.' = todos los ciclos. Las metricas EMF no llevan cicloId (dimension no disponible).",
+        "hide": 0
+      },
+      {
+        "type": "query",
+        "name": "sfn",
+        "label": "State machine",
+        "datasource": {
+          "type": "cloudwatch",
+          "uid": "cloudwatch"
+        },
+        "query": {
+          "queryType": "dimensionValues",
+          "region": "default",
+          "namespace": "AWS/States",
+          "metricName": "ExecutionsStarted",
+          "dimensionKey": "StateMachineArn",
+          "dimensionFilters": {},
+          "refId": "VarSfn"
+        },
+        "regex": "/.*voltera-exp2-facturacion$/",
+        "refresh": 2,
+        "includeAll": false,
+        "multi": false,
+        "sort": 0,
+        "hide": 0,
+        "current": {},
+        "options": []
+      },
+      {
+        "type": "textbox",
+        "name": "facturaId",
+        "label": "facturaId",
+        "query": ".",
+        "current": {
+          "text": ".",
+          "value": "."
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": ".",
+            "value": "."
+          }
+        ],
+        "description": "Regex sobre facturaId; '.' = todas.",
+        "hide": 0
+      }
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "links": [
+    {
+      "type": "dashboards",
+      "tags": [
+        "voltera"
+      ],
+      "asDropdown": true,
+      "title": "Dashboards Voltera",
+      "includeVars": false,
+      "keepTime": true
+    }
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "Hipotesis",
+      "description": "",
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "El mesh registra cada evento con `cicloId` + `facturaId`, permite reconstruir el recorrido de cada factura y mostrar el estado del ciclo. Los eventos viven en Kafka (`voltera.eventos`); aqui se observan a traves de las metricas EMF y de los logs estructurados de cada paso. Replay por offset, MirrorMaker2 y Apicurio se verifican con los scripts del cluster, no por CloudWatch."
+      }
+    },
+    {
+      "id": 2,
+      "type": "row",
+      "title": "Completitud de eventos",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 3
+      },
+      "panels": []
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Eventos esperados vs. registrados por etapa (acumulado)  (eje X: hora)",
+      "description": "Cada factura aprobada debe producir TarifaValidada, CargoEnergeticoCalculado, FacturaEmitida y FacturaNotificada. Serie 'esperadas' = techo. Eje Y: Eventos acumulados. Eje X: tiempo (hora local).",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "Am",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "UnidadesEnOutbox",
+          "dimensions": {
+            "service": "ms-orchestrator-billing"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "i",
+          "expression": "",
+          "label": "esperadas (inyectadas)",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 1,
+          "expression": "RUNNING_SUM(FILL(i,0))",
+          "id": "",
+          "period": "60",
+          "region": "default",
+          "label": "esperadas (inyectadas)",
+          "hide": false,
+          "namespace": "",
+          "metricName": "",
+          "dimensions": {},
+          "statistic": "Average",
+          "matchExact": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "Bm",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "TarifasValidadas",
+          "dimensions": {
+            "service": "ms-tarifas"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "t1",
+          "expression": "",
+          "label": "t1",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "Cm",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "TarifasRechazadas",
+          "dimensions": {
+            "service": "ms-tarifas"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "t2",
+          "expression": "",
+          "label": "t2",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "B",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 1,
+          "expression": "RUNNING_SUM(FILL(t1,0)) + RUNNING_SUM(FILL(t2,0))",
+          "id": "",
+          "period": "60",
+          "region": "default",
+          "label": "tarifa (validada+rechazada)",
+          "hide": false,
+          "namespace": "",
+          "metricName": "",
+          "dimensions": {},
+          "statistic": "Average",
+          "matchExact": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "Dm",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "CargosCalculados",
+          "dimensions": {
+            "service": "ms-calculo-consumo-neto"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "c1",
+          "expression": "",
+          "label": "c1",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "Em",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "CalculosRechazados",
+          "dimensions": {
+            "service": "ms-calculo-consumo-neto"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "c2",
+          "expression": "",
+          "label": "c2",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "D",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 1,
+          "expression": "RUNNING_SUM(FILL(c1,0)) + RUNNING_SUM(FILL(c2,0))",
+          "id": "",
+          "period": "60",
+          "region": "default",
+          "label": "calculo (calculado+rechazado)",
+          "hide": false,
+          "namespace": "",
+          "metricName": "",
+          "dimensions": {},
+          "statistic": "Average",
+          "matchExact": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "Fm",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "FacturasEmitidas",
+          "dimensions": {
+            "service": "ms-facturacion"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "f",
+          "expression": "",
+          "label": "FacturaEmitida",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "F",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 1,
+          "expression": "RUNNING_SUM(FILL(f,0))",
+          "id": "",
+          "period": "60",
+          "region": "default",
+          "label": "FacturaEmitida",
+          "hide": false,
+          "namespace": "",
+          "metricName": "",
+          "dimensions": {},
+          "statistic": "Average",
+          "matchExact": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "Gm",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "FacturasNotificadas",
+          "dimensions": {
+            "service": "ms-comprobante-factura"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "g",
+          "expression": "",
+          "label": "FacturaNotificada",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "G",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 1,
+          "expression": "RUNNING_SUM(FILL(g,0))",
+          "id": "",
+          "period": "60",
+          "region": "default",
+          "label": "FacturaNotificada",
+          "hide": false,
+          "namespace": "",
+          "metricName": "",
+          "dimensions": {},
+          "statistic": "Average",
+          "matchExact": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "axisLabel": "Eventos acumulados",
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "Eventos publicados al mesh por factura (completitud)",
+      "description": "Log 'evento publicado' (tipo, cicloId, facturaId, eventId) del publisher. Una factura completa aprobada publica TarifaValidada, CargoEnergeticoCalculado, FacturaEmitida, NotificacionRegistrada y FacturaNotificada. Filas con pocos tipos = eventos faltantes o rechazo de negocio.",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Logs",
+          "region": "default",
+          "id": "",
+          "expression": "filter message = \"evento publicado\" and cicloId like /$cicloId/ and facturaId like /$facturaId/\n| stats count_distinct(tipo) as tipos_distintos, count(*) as publicaciones, min(@timestamp) as primera, max(@timestamp) as ultima by cicloId, facturaId\n| sort tipos_distintos asc, ultima desc\n| limit 200",
+          "logGroupNames": [
+            "/aws/lambda/voltera-exp2-ms-tarifas",
+            "/aws/lambda/voltera-exp2-ms-calculo-consumo-neto",
+            "/aws/lambda/voltera-exp2-ms-facturacion",
+            "/aws/lambda/voltera-exp2-ms-comprobante-factura",
+            "/aws/lambda/voltera-exp2-ms-orchestrator-billing"
+          ],
+          "logGroups": [],
+          "statsGroups": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      }
+    },
+    {
+      "id": 5,
+      "type": "row",
+      "title": "Fallos de publicacion al mesh",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "panels": []
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "MeshPublishFailures por servicio  (eje X: hora)",
+      "description": "Metrica EMF emitida por el publisher cuando falla publish_event (best-effort: el paso de negocio continua). Eje Y: Fallos de publicación al mesh. Eje X: tiempo (hora local).",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 13
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 1,
+          "expression": "SEARCH('{Voltera/Exp2,service} MetricName=\"MeshPublishFailures\"', 'Sum', 60)",
+          "id": "",
+          "period": "60",
+          "region": "default",
+          "label": "${PROP('Dim.service')}",
+          "hide": false,
+          "namespace": "",
+          "metricName": "",
+          "dimensions": {},
+          "statistic": "Average",
+          "matchExact": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "axisLabel": "Fallos de publicación al mesh",
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "Fallos de publicacion detectados por log ('fallo publicando')",
+      "description": "Detalle: el publisher registra el error en un log JSON ('fallo publicando evento al mesh').",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 16,
+        "x": 8,
+        "y": 13
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Logs",
+          "region": "default",
+          "id": "",
+          "expression": "fields @timestamp, @log, @message\n| filter @message like /fallo publicando evento/\n| sort @timestamp desc\n| limit 100",
+          "logGroupNames": [
+            "/aws/lambda/voltera-exp2-ms-tarifas",
+            "/aws/lambda/voltera-exp2-ms-calculo-consumo-neto",
+            "/aws/lambda/voltera-exp2-ms-facturacion",
+            "/aws/lambda/voltera-exp2-ms-comprobante-factura",
+            "/aws/lambda/voltera-exp2-outbox-relay"
+          ],
+          "logGroups": [],
+          "statsGroups": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      }
+    },
+    {
+      "id": 8,
+      "type": "row",
+      "title": "Linea de tiempo por factura / ciclo",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 21
+      },
+      "panels": []
+    },
+    {
+      "id": 9,
+      "type": "logs",
+      "title": "Linea de tiempo (filtra por cicloId y facturaId arriba)",
+      "description": "Union de los logs JSON de los 6 Lambdas. Incluye eventos publicados, comprobante recibido/procesado. Los logs de process-billing viven en el log group de Container Insights (application); ver README.",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 22
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Logs",
+          "region": "default",
+          "id": "",
+          "expression": "fields @timestamp, service, message, tipo, cicloId, facturaId, aprobado, numero, level\n| filter cicloId like /$cicloId/ and facturaId like /$facturaId/\n| sort @timestamp asc\n| limit 500",
+          "logGroupNames": [
+            "/aws/lambda/voltera-exp2-ms-orchestrator-billing",
+            "/aws/lambda/voltera-exp2-outbox-relay",
+            "/aws/lambda/voltera-exp2-ms-tarifas",
+            "/aws/lambda/voltera-exp2-ms-calculo-consumo-neto",
+            "/aws/lambda/voltera-exp2-ms-facturacion",
+            "/aws/lambda/voltera-exp2-ms-comprobante-factura",
+            "/aws/containerinsights/voltera-exp2-eph/application"
+          ],
+          "logGroups": [],
+          "statsGroups": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Ascending",
+        "enableLogDetails": true
+      }
+    },
+    {
+      "id": 10,
+      "type": "table",
+      "title": "Ejecuciones de Step Functions del ciclo (log de la state machine)",
+      "description": "La entrada de la ejecucion (details.input) contiene cicloId/facturaId; el filtro es por texto del evento.",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 33
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Logs",
+          "region": "default",
+          "id": "",
+          "expression": "fields @timestamp, type, execution_arn\n| filter type in [\"ExecutionStarted\",\"ExecutionSucceeded\",\"ExecutionFailed\",\"ExecutionTimedOut\"] and @message like /$cicloId/\n| sort @timestamp desc\n| limit 100",
+          "logGroupNames": [
+            "/aws/vendedlogs/states/voltera-exp2-facturacion"
+          ],
+          "logGroups": [],
+          "statsGroups": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      }
+    },
+    {
+      "id": 11,
+      "type": "row",
+      "title": "Estado del ciclo",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 40
+      },
+      "panels": []
+    },
+    {
+      "id": 12,
+      "type": "stat",
+      "title": "Ciclos completados",
+      "description": "",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 0,
+        "y": 41
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "CiclosCompletados",
+          "dimensions": {
+            "service": "ms-process-billing"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "",
+          "expression": "",
+          "label": "CiclosCompletados",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "sum"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "center"
+      }
+    },
+    {
+      "id": 13,
+      "type": "stat",
+      "title": "Ciclos fallidos",
+      "description": "",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 4,
+        "y": 41
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "CiclosFallidos",
+          "dimensions": {
+            "service": "ms-process-billing"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "",
+          "expression": "",
+          "label": "CiclosFallidos",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "sum"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "center"
+      }
+    },
+    {
+      "id": 14,
+      "type": "stat",
+      "title": "Duracion del ciclo (s)",
+      "description": "",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 8,
+        "y": 41
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "CicloDuracionSegundos",
+          "dimensions": {
+            "service": "ms-process-billing"
+          },
+          "statistic": "Maximum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "",
+          "expression": "",
+          "label": "CicloDuracionSegundos",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "center"
+      }
+    },
+    {
+      "id": 15,
+      "type": "stat",
+      "title": "Ejecuciones exitosas",
+      "description": "",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 12,
+        "y": 41
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "AWS/States",
+          "metricName": "ExecutionsSucceeded",
+          "dimensions": {
+            "StateMachineArn": "$sfn"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "",
+          "expression": "",
+          "label": "ExecutionsSucceeded",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "sum"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "center"
+      }
+    },
+    {
+      "id": 16,
+      "type": "stat",
+      "title": "Ejecuciones fallidas",
+      "description": "",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 16,
+        "y": 41
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "AWS/States",
+          "metricName": "ExecutionsFailed",
+          "dimensions": {
+            "StateMachineArn": "$sfn"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "",
+          "expression": "",
+          "label": "ExecutionsFailed",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "sum"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "center"
+      }
+    },
+    {
+      "id": 17,
+      "type": "stat",
+      "title": "DLQ transacciones",
+      "description": "",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 20,
+        "y": 41
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "AWS/SQS",
+          "metricName": "ApproximateNumberOfMessagesVisible",
+          "dimensions": {
+            "QueueName": "voltera-exp2-transacciones-dlq"
+          },
+          "statistic": "Maximum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "",
+          "expression": "",
+          "label": "ApproximateNumberOfMessagesVisible",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "center"
+      }
+    },
+    {
+      "id": 18,
+      "type": "stat",
+      "title": "Saldo del ciclo (proxy de estado)",
+      "description": "0 = todo inyectado quedo emitido, rechazado o en DLQ (ciclo cerrado).",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 0,
+        "y": 49
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "UnidadesEnOutbox",
+          "dimensions": {
+            "service": "ms-orchestrator-billing"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "inj",
+          "expression": "",
+          "label": "inyectadas",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "B",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "FacturasEmitidas",
+          "dimensions": {
+            "service": "ms-facturacion"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "em",
+          "expression": "",
+          "label": "emitidas",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "C",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "TarifasRechazadas",
+          "dimensions": {
+            "service": "ms-tarifas"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "rt",
+          "expression": "",
+          "label": "rech_tarifa",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "D",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "CalculosRechazados",
+          "dimensions": {
+            "service": "ms-calculo-consumo-neto"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "rc",
+          "expression": "",
+          "label": "rech_calculo",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "E",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "EmisionesRechazadas",
+          "dimensions": {
+            "service": "ms-facturacion"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "re",
+          "expression": "",
+          "label": "rech_emision",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "F",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "AWS/SQS",
+          "metricName": "ApproximateNumberOfMessagesVisible",
+          "dimensions": {
+            "QueueName": "voltera-exp2-transacciones-dlq"
+          },
+          "statistic": "Maximum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "dlq",
+          "expression": "",
+          "label": "dlq",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "G",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 1,
+          "expression": "RUNNING_SUM(FILL(inj,0)) - RUNNING_SUM(FILL(em,0)) - RUNNING_SUM(FILL(rt,0)) - RUNNING_SUM(FILL(rc,0)) - RUNNING_SUM(FILL(re,0)) - FILL(dlq,0)",
+          "id": "saldo",
+          "period": "60",
+          "region": "default",
+          "label": "saldo (en vuelo + perdidas)",
+          "hide": false,
+          "namespace": "",
+          "metricName": "",
+          "dimensions": {},
+          "statistic": "Average",
+          "matchExact": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "center"
+      }
+    },
+    {
+      "id": 19,
+      "type": "row",
+      "title": "Trazas X-Ray",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 57
+      },
+      "panels": []
+    },
+    {
+      "id": 20,
+      "type": "table",
+      "title": "Trazas recientes (resumen)",
+      "description": "Trazas de Lambdas (Powertools Tracer) y Step Functions (tracing activo). Anotaciones X-Ray cicloId y facturaId: filtra con  annotation.cicloId = <id>  o  annotation.facturaId = <id>.",
+      "datasource": {
+        "type": "grafana-x-ray-datasource",
+        "uid": "xray"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 58
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-x-ray-datasource",
+            "uid": "xray"
+          },
+          "refId": "A",
+          "queryType": "getTraceSummaries",
+          "region": "default",
+          "query": "annotation.cicloId = \"${cicloId}\"",
+          "group": {
+            "GroupName": "Default"
+          },
+          "columns": [
+            "Id",
+            "Method",
+            "ResponseTime",
+            "Duration",
+            "HasError",
+            "HasFault"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "Estadisticas de servicio (latencia/errores)",
+      "description": "",
+      "datasource": {
+        "type": "grafana-x-ray-datasource",
+        "uid": "xray"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 66
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-x-ray-datasource",
+            "uid": "xray"
+          },
+          "refId": "A",
+          "queryType": "getTimeSeriesServiceStatistics",
+          "region": "default",
+          "query": "",
+          "group": {
+            "GroupName": "Default"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 22,
+      "type": "nodeGraph",
+      "title": "Mapa de servicios",
+      "description": "",
+      "datasource": {
+        "type": "grafana-x-ray-datasource",
+        "uid": "xray"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 66
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-x-ray-datasource",
+            "uid": "xray"
+          },
+          "refId": "A",
+          "queryType": "getServiceMap",
+          "region": "default",
+          "query": "",
+          "group": {
+            "GroupName": "Default"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    }
+  ]
+}

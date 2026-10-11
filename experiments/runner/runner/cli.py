@@ -1,0 +1,135 @@
+"""CLI: python -m runner exp1|exp2|exp3|exp4|all|restore [opciones]."""
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+from . import actions
+from .config import REPORTS_DIR, ConfigError, load_config
+from .context import Context
+from .experiments.exp1 import Exp1
+from .experiments.exp2 import Exp2
+from .experiments.exp3 import Exp3
+from .experiments.exp4 import Exp4
+from .report import write_report
+from .safety import Aborted, SafetyError
+
+EXPERIMENTS = {"exp1": Exp1, "exp2": Exp2, "exp3": Exp3, "exp4": Exp4}
+
+
+def build_parser() -> argparse.ArgumentParser:
+    common = argparse.ArgumentParser(add_help=False)
+    g = common.add_argument_group("generales")
+    g.add_argument("--n", "--n-solicitudes", dest="n", type=int, default=None, help="N_SOLICITUDES (por defecto el de terraform, 10)")
+    g.add_argument("--ciclo-id", default=None, help="cicloId (por defecto EXP-<UTC timestamp>)")
+    g.add_argument("--dry-run", action="store_true", help="imprime el plan de acciones sin llamar a AWS ni a kubectl")
+    g.add_argument("--config", default=None, help="JSON con salidas de `terraform output -json` (si no, se leen de terraform base/platform)")
+    g.add_argument("--yes", "-y", action="store_true", help="no pedir confirmacion interactiva (exp2/exp3 modifican estado)")
+    g.add_argument("--region", default=None, help="region AWS (var AWS_REGION; por defecto us-east-1)")
+    g.add_argument("--profile", default=None, help="perfil AWS (var AWS_PROFILE)")
+    g.add_argument("--prefix", default=None, help="prefijo del proyecto; solo se actua sobre recursos que lo usen (var VOLTERA_PREFIX)")
+    g.add_argument("--kube-context", default=None, help="contexto de kubectl")
+    g.add_argument("--reports-dir", default=str(REPORTS_DIR))
+    t = common.add_argument_group("ajustes de experimentos")
+    t.add_argument("--delay", type=float, default=None, help="retardo simulado por mensaje (s) en process-billing (exp1/exp3)")
+    t.add_argument("--sla", type=float, default=None, help="SLA del lote en s (exp1)")
+    t.add_argument("--fault-mode", choices=["env", "concurrency"], default="env", help="exp2/3: FORCE_FAIL=true o concurrencia reservada 0")
+    t.add_argument("--case", choices=["A", "B", "a", "b"], default=None, help="exp2: solo el caso A (ms-tarifas) o B (ms-comprobante-factura)")
+    t.add_argument("--timeout", type=float, default=None, help="tope de espera principal en s")
+    t.add_argument("--poll", type=float, default=None, help="intervalo de muestreo en s")
+    t.add_argument("--scaledown-timeout", type=float, default=None)
+    t.add_argument("--skip-scaledown", action="store_true")
+    t.add_argument("--fault-window", type=float, default=None, help="exp3: segundos con el comprobante caido")
+    t.add_argument("--graceful", action="store_true", help="exp3: apagado ordenado del pod en vez de --force --grace-period=0")
+    t.add_argument("--no-dispatch", action="store_true", help="exp4: auditar un ciclo ya ejecutado")
+    t.add_argument("--asyncapi", default=None)
+
+    p = argparse.ArgumentParser(prog="python -m runner", description="Runner de la experimentacion 2 de Voltera.")
+    sub = p.add_subparsers(dest="cmd", required=True)
+    for name, cls in EXPERIMENTS.items():
+        sub.add_parser(name, parents=[common], help=cls.title)
+    sub.add_parser("all", parents=[common], help="exp1 a exp4 en orden")
+    rs = sub.add_parser("restore", parents=[common], help="revierte los cambios pendientes de la bitacora (fallos inyectados)")
+    rs.add_argument("--list", action="store_true", help="solo listar los cambios registrados")
+    return p
+
+
+def _options(a) -> dict:
+    keys = ["delay", "sla", "fault_mode", "case", "timeout", "poll", "scaledown_timeout", "skip_scaledown", "fault_window",
+            "graceful", "no_dispatch", "asyncapi"]
+    return {k: getattr(a, k) for k in keys if getattr(a, k, None) not in (None, False)}
+
+
+def make_context(a, **kw) -> Context:
+    cfg = load_config(a.config, dry_run=a.dry_run, region=a.region, profile=a.profile, prefix=a.prefix)
+    if a.kube_context:
+        cfg.kube_context = a.kube_context
+    return Context(cfg, yes=a.yes, dry_run=a.dry_run, reports_dir=Path(a.reports_dir), options=_options(a), **kw)
+
+
+def cmd_restore(a, ctx: Context) -> int:
+    entries = ctx.journal.all()
+    pend = ctx.journal.pending()
+    if a.list or a.dry_run:
+        print(f"{len(entries)} cambios registrados, {len(pend)} pendientes de revertir ({ctx.journal.path}):")
+        for e in entries:
+            print(f"  [{'PENDIENTE' if e in pend else 'ok'}] {e['id']} {e['ts']} {e['kind']} {e['target']} antes={e['before']}")
+        return 0
+    if not pend:
+        print("Nada que restaurar.")
+        return 0
+    ctx.confirm([f"revertir {e['kind']} en {e['target']} a {e['before']}" for e in pend])
+    for line in actions.restore_all(ctx):
+        print(line)
+    left = ctx.journal.pending()
+    print("Restauracion completa." if not left else f"AUN PENDIENTES: {[e['id'] for e in left]}")
+    return 0 if not left else 1
+
+
+def main(argv: list[str] | None = None, *, ctx_factory=None) -> int:
+    a = build_parser().parse_args(argv)
+    try:
+        ctx = ctx_factory(a) if ctx_factory else make_context(a)
+    except ConfigError as exc:
+        print(f"Error de configuracion: {exc}", file=sys.stderr)
+        return 2
+    if a.cmd == "restore":
+        try:
+            return cmd_restore(a, ctx)
+        except (Aborted, SafetyError) as exc:
+            print(f"Abortado: {exc}", file=sys.stderr)
+            return 2
+    names = list(EXPERIMENTS) if a.cmd == "all" else [a.cmd]
+    n = a.n or ctx.cfg.n_default
+    base_ciclo = a.ciclo_id or actions.new_ciclo_id()
+    if a.dry_run:
+        print(f"# DRY-RUN: no se llama a AWS ni a kubectl (config {'por defecto' if ctx.cfg.placeholder else 'cargada'}, "
+              f"region {ctx.cfg.region}, prefijo {ctx.cfg.prefix}, N={n})")
+    rc = 0
+    for name in names:
+        ciclo = base_ciclo if len(names) == 1 else f"{base_ciclo}-{name.upper()}"
+        exp = EXPERIMENTS[name](ctx, n, ciclo)
+        if a.dry_run:
+            print(f"\n## {exp.title}" + ("  [modifica estado: pedira confirmacion]" if exp.mutates else ""))
+            for i, s in enumerate(exp.plan(), 1):
+                print(f"{i:>2}. {s}")
+            if exp.mutates:
+                print("    Cambios a registrar/revertir:")
+                for m in exp.mutations():
+                    print(f"      - {m}")
+            continue
+        try:
+            res = exp.run()
+        except (Aborted, SafetyError) as exc:
+            print(f"Abortado: {exc}", file=sys.stderr)
+            return 2
+        out = write_report(res, ctx.reports_dir)
+        print(f"\n== {res.title}: {res.verdict}  (reporte: {out})")
+        for c in res.criteria:
+            print(f"  [{c.status:6}] {c.id} {c.title}" + (f" -> {c.observed}" if c.status != 'PASS' else ""))
+        if res.error:
+            print(f"  ERROR: {res.error.splitlines()[0]}")
+        if res.verdict == "FAIL":
+            rc = 1
+    return rc

@@ -1,0 +1,196 @@
+{
+  "Comment": "Voltera - flujo de facturacion: tarifas -> calculo -> facturacion -> FacturaEmitida. Catch -> DLQ de transacciones.",
+  "StartAt": "NormalizarEntrada",
+  "States": {
+    "NormalizarEntrada": {
+      "Type": "Pass",
+      "Comment": "EventBridge Pipes entrega un arreglo de mensajes SQS (batch 1); el body es el JSON de la transaccion (cicloId, facturaId, ...).",
+      "Parameters": {
+        "tx.$": "States.StringToJson($[0].body)"
+      },
+      "Next": "ValidarTarifa"
+    },
+    "ValidarTarifa": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${lambda_tarifas_arn}",
+        "Payload.$": "$.tx"
+      },
+      "ResultSelector": {
+        "resultado.$": "$.Payload"
+      },
+      "ResultPath": "$.tarifa",
+      "Retry": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "IntervalSeconds": ${retry_interval_seconds},
+          "MaxAttempts": ${retry_max_attempts},
+          "BackoffRate": ${retry_backoff_rate}
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "EnviarADLQ"
+        }
+      ],
+      "Next": "ChoiceTarifa"
+    },
+    "ChoiceTarifa": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.tarifa.resultado.aprobado",
+          "BooleanEquals": false,
+          "Next": "RechazadaPorNegocio"
+        }
+      ],
+      "Default": "CalcularConsumoNeto"
+    },
+    "CalcularConsumoNeto": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${lambda_calculo_arn}",
+        "Payload": {
+          "tx.$": "$.tx",
+          "tarifa.$": "$.tarifa.resultado"
+        }
+      },
+      "ResultSelector": {
+        "resultado.$": "$.Payload"
+      },
+      "ResultPath": "$.calculo",
+      "Retry": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "IntervalSeconds": ${retry_interval_seconds},
+          "MaxAttempts": ${retry_max_attempts},
+          "BackoffRate": ${retry_backoff_rate}
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "EnviarADLQ"
+        }
+      ],
+      "Next": "ChoiceCalculo"
+    },
+    "ChoiceCalculo": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.calculo.resultado.aprobado",
+          "BooleanEquals": false,
+          "Next": "RechazadaPorNegocio"
+        }
+      ],
+      "Default": "EmitirFactura"
+    },
+    "EmitirFactura": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${lambda_facturacion_arn}",
+        "Payload": {
+          "tx.$": "$.tx",
+          "tarifa.$": "$.tarifa.resultado",
+          "calculo.$": "$.calculo.resultado"
+        }
+      },
+      "ResultSelector": {
+        "resultado.$": "$.Payload"
+      },
+      "ResultPath": "$.factura",
+      "Retry": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "IntervalSeconds": ${retry_interval_seconds},
+          "MaxAttempts": ${retry_max_attempts},
+          "BackoffRate": ${retry_backoff_rate}
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "EnviarADLQ"
+        }
+      ],
+      "Next": "ChoiceFactura"
+    },
+    "ChoiceFactura": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.factura.resultado.aprobado",
+          "BooleanEquals": false,
+          "Next": "RechazadaPorNegocio"
+        }
+      ],
+      "Default": "PublicarFacturaEmitida"
+    },
+    "PublicarFacturaEmitida": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sqs:sendMessage",
+      "Parameters": {
+        "QueueUrl": "${comprobantes_queue_url}",
+        "MessageBody": {
+          "evento": "FacturaEmitida",
+          "cicloId.$": "$.tx.cicloId",
+          "facturaId.$": "$.tx.facturaId"
+        }
+      },
+      "ResultPath": null,
+      "Retry": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "IntervalSeconds": ${retry_interval_seconds},
+          "MaxAttempts": ${retry_max_attempts},
+          "BackoffRate": ${retry_backoff_rate}
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "EnviarADLQ"
+        }
+      ],
+      "Next": "Exito"
+    },
+    "EnviarADLQ": {
+      "Type": "Task",
+      "Comment": "Se reenvia la transaccion ORIGINAL (para poder hacer SQS redrive tal cual) con el error como atributo.",
+      "Resource": "arn:aws:states:::sqs:sendMessage",
+      "Parameters": {
+        "QueueUrl": "${dlq_transactions_url}",
+        "MessageBody.$": "States.JsonToString($.tx)",
+        "MessageAttributes": {
+          "ErrorType": {
+            "DataType": "String",
+            "StringValue.$": "$.error.Error"
+          }
+        }
+      },
+      "ResultPath": null,
+      "Next": "Fallida"
+    },
+    "Fallida": {
+      "Type": "Fail",
+      "Error": "FacturacionFallida",
+      "Cause": "La transaccion agoto reintentos y se envio a la DLQ de transacciones."
+    },
+    "RechazadaPorNegocio": {
+      "Type": "Succeed",
+      "Comment": "Rechazo de negocio (aprobado=false): no es error tecnico, no va a la DLQ."
+    },
+    "Exito": {
+      "Type": "Succeed"
+    }
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CloudWatchMetricsRead",
+      "Effect": "Allow",
+      "Action": [
+        "cloudwatch:GetMetricData",
+        "cloudwatch:GetMetricStatistics",
+        "cloudwatch:ListMetrics",
+        "cloudwatch:DescribeAlarms",
+        "cloudwatch:DescribeAlarmsForMetric"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "LogsDiscovery",
+      "Effect": "Allow",
+      "Action": [
+        "logs:DescribeLogGroups",
+        "logs:GetQueryResults",
+        "logs:StopQuery"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "LogsInsightsSoloLogGroupsDelExperimento",
+      "Effect": "Allow",
+      "Action": [
+        "logs:StartQuery",
+        "logs:DescribeLogStreams",
+        "logs:GetLogEvents",
+        "logs:FilterLogEvents",
+        "logs:GetLogGroupFields"
+      ],
+      "Resource": [
+        "arn:aws:logs:*:*:log-group:/aws/lambda/voltera-exp2-*",
+        "arn:aws:logs:*:*:log-group:/aws/lambda/voltera-exp2-*:*",
+        "arn:aws:logs:*:*:log-group:/aws/vendedlogs/states/voltera-exp2-*",
+        "arn:aws:logs:*:*:log-group:/aws/vendedlogs/states/voltera-exp2-*:*",
+        "arn:aws:logs:*:*:log-group:/aws/containerinsights/voltera-exp2-eph/*",
+        "arn:aws:logs:*:*:log-group:/aws/containerinsights/voltera-exp2-eph/*:*"
+      ]
+    },
+    {
+      "Sid": "XRayRead",
+      "Effect": "Allow",
+      "Action": [
+        "xray:BatchGetTraces",
+        "xray:GetTraceSummaries",
+        "xray:GetTraceGraph",
+        "xray:GetServiceGraph",
+        "xray:GetTimeSeriesServiceStatistics",
+        "xray:GetInsightSummaries",
+        "xray:GetGroups",
+        "xray:GetSamplingRules"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ListadoDeRecursos",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeRegions",
+        "tag:GetResources",
+        "sqs:ListQueues",
+        "lambda:ListFunctions",
+        "states:ListStateMachines"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

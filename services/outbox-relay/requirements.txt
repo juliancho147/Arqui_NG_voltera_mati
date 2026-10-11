@@ -1,0 +1,4 @@
+# Powertools viene en el layer (powertools_layer_arn). voltera_common se vendoriza con services/build.sh.
+aws-lambda-powertools>=3.0
+pydantic>=2.6
+confluent-kafka>=2.4

@@ -1,0 +1,16 @@
+Metadata-Version: 2.4
+Name: voltera-common
+Version: 0.2.0
+Summary: Libreria comun de la experimentacion 2 de Voltera: CloudEvents, publicador al Event Mesh, correlacion e inyeccion de fallos
+Requires-Python: >=3.12
+Requires-Dist: pydantic>=2.6
+Provides-Extra: kafka
+Requires-Dist: confluent-kafka>=2.4; extra == "kafka"
+Provides-Extra: aws
+Requires-Dist: aws-lambda-powertools>=3.0; extra == "aws"
+Requires-Dist: boto3>=1.34; extra == "aws"
+Provides-Extra: test
+Requires-Dist: pytest>=8; extra == "test"
+Requires-Dist: moto[dynamodb,sqs]>=5; extra == "test"
+Requires-Dist: aws-lambda-powertools>=3.0; extra == "test"
+Requires-Dist: boto3>=1.34; extra == "test"

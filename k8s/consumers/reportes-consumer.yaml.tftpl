@@ -1,0 +1,50 @@
+# Consumidor de "reportes" en el clúster DOMINIOS (prueba de extensibilidad: se despliega sin tocar nada de lo existente).
+# Consume billing.voltera.eventos (réplica de MirrorMaker2) con su propio consumer group y registra cada evento
+# como una línea JSON con cicloId/facturaId (tomados de los headers Kafka).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reportes-consumer
+  namespace: ${namespace}
+  labels:
+    app.kubernetes.io/name: reportes-consumer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: reportes-consumer
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: reportes-consumer
+    spec:
+      containers:
+        - name: consumer
+          image: ${image}
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              # Reintenta hasta que el tópico replicado exista (MM2 lo crea al replicar el primer evento).
+              while true; do
+                /opt/kafka/bin/kafka-console-consumer.sh \
+                  --bootstrap-server ${bootstrap} \
+                  --topic ${topic} --group ${group} --from-beginning \
+                  --property print.headers=true --property print.key=true --property print.timestamp=false \
+                  --property key.separator=$'\t' 2>/dev/null |
+                while IFS=$'\t' read -r headers key value; do
+                  ciclo=$(printf '%s' "$headers" | sed -n 's/.*cicloId:\([^,]*\).*/\1/p')
+                  factura=$(printf '%s' "$headers" | sed -n 's/.*facturaId:\([^,]*\).*/\1/p')
+                  printf '{"consumer":"reportes","topic":"${topic}","key":"%s","cicloId":"%s","facturaId":"%s","event":%s}\n' \
+                    "$key" "$ciclo" "$factura" "$value"
+                done
+                sleep 5
+              done
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              memory: 384Mi
+          env:
+            - name: KAFKA_HEAP_OPTS
+              value: "-Xms64m -Xmx192m"

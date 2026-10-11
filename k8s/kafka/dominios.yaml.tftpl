@@ -1,0 +1,53 @@
+# Clúster Kafka "dominios": representa otros dominios (reportes / tiempo real). Recibe réplica de eventos.
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaNodePool
+metadata:
+  name: dominios-nodes
+  namespace: ${namespace}
+  labels:
+    strimzi.io/cluster: dominios
+  annotations:
+    strimzi.io/next-node-ids: "[0]"
+spec:
+  replicas: 1
+  roles:
+    - controller
+    - broker
+  storage:
+    type: persistent-claim
+    size: ${storage_size}
+    class: ${storage_class}
+    deleteClaim: true
+  resources:
+    requests:
+      cpu: 250m
+      memory: ${memory_request}
+    limits:
+      memory: ${memory_limit}
+  jvmOptions:
+    -Xms: ${heap}
+    -Xmx: ${heap}
+---
+apiVersion: kafka.strimzi.io/v1
+kind: Kafka
+metadata:
+  name: dominios
+  namespace: ${namespace}
+spec:
+  kafka:
+    version: ${kafka_version}
+    listeners:
+      - name: plain
+        port: 9092
+        type: internal
+        tls: false
+    config:
+      offsets.topic.replication.factor: 1
+      transaction.state.log.replication.factor: 1
+      transaction.state.log.min.isr: 1
+      default.replication.factor: 1
+      min.insync.replicas: 1
+      # MirrorMaker2 crea aquí los tópicos replicados (billing.voltera.eventos).
+      auto.create.topics.enable: false
+      log.retention.hours: 24
+  # Sin entityOperator: ahorra ~250 MiB; los tópicos los crea MirrorMaker2.

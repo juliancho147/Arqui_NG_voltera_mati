@@ -1,0 +1,10 @@
+# cp terraform.tfvars.example terraform.tfvars
+aws_region      = "us-east-1"
+base_state_path = "../../base/terraform.tfstate"
+
+# Restringe el endpoint público del API a tu IP:
+# public_access_cidrs = ["203.0.113.10/32"]
+
+# node_instance_types = ["t3.large"]
+# node_desired_size   = 2
+# enable_container_insights = true

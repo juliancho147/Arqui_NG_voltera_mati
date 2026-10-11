@@ -1,0 +1,30 @@
+# Tópicos declarativos del clúster "billing" (KafkaTopic gestionado por el Topic Operator).
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: voltera.consumo-facturable-preparado
+  namespace: ${namespace}
+  labels:
+    strimzi.io/cluster: billing
+spec:
+  topicName: voltera.consumo-facturable-preparado
+  # >= réplicas máximas de KEDA (un consumidor por partición como máximo).
+  partitions: ${ingreso_partitions}
+  replicas: 1
+  config:
+    retention.ms: ${retention_ms}
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: voltera.eventos
+  namespace: ${namespace}
+  labels:
+    strimzi.io/cluster: billing
+spec:
+  topicName: voltera.eventos
+  # Clave del registro = facturaId; headers: cicloId, facturaId. Valor: CloudEvents estructurado JSON.
+  partitions: ${eventos_partitions}
+  replicas: 1
+  config:
+    retention.ms: ${retention_ms}

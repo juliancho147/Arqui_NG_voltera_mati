@@ -1,0 +1,91 @@
+# Clúster Kafka "billing": núcleo del flujo de facturación. KRaft, 1 nodo (controller+broker).
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaNodePool
+metadata:
+  name: billing-nodes
+  namespace: ${namespace}
+  labels:
+    strimzi.io/cluster: billing
+  annotations:
+    strimzi.io/next-node-ids: "[0]"
+spec:
+  replicas: 1
+  roles:
+    - controller
+    - broker
+  storage:
+    type: persistent-claim
+    size: ${storage_size}
+    class: ${storage_class}
+    deleteClaim: true   # el PVC (y el EBS) se borran con el clúster
+  resources:
+    requests:
+      cpu: 250m
+      memory: ${memory_request}
+    limits:
+      memory: ${memory_limit}
+  jvmOptions:
+    -Xms: ${heap}
+    -Xmx: ${heap}
+---
+apiVersion: kafka.strimzi.io/v1
+kind: Kafka
+metadata:
+  name: billing
+  namespace: ${namespace}
+spec:
+  kafka:
+    version: ${kafka_version}
+    listeners:
+      # Acceso dentro del clúster (ms-process-billing, KEDA, MirrorMaker2). Sin TLS ni auth.
+      # TODO(seguridad): TLS + SCRAM (KafkaUser) y KafkaUser con ACL por servicio.
+      - name: plain
+        port: 9092
+        type: internal
+        tls: false
+      # Acceso desde la VPC para outbox-relay (Lambda): NLB INTERNO, un solo LB (sin bootstrap service).
+      # Con 1 broker el DNS del NLB sirve como bootstrap. Sin auth; protegido por SG (solo VPC).
+      # TODO(seguridad): SASL/SCRAM + TLS si el experimento sale del laboratorio.
+      - name: vpc
+        port: 9094
+        type: loadbalancer
+        tls: false
+        configuration:
+          createBootstrapService: false
+          loadBalancerSourceRanges:
+            - ${vpc_cidr}
+          brokers:
+            - broker: 0
+              annotations:
+                service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+                service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+                service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+                service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags: "${lb_tags}"
+    config:
+      # Un solo broker: todo con factor de replicación 1.
+      offsets.topic.replication.factor: 1
+      transaction.state.log.replication.factor: 1
+      transaction.state.log.min.isr: 1
+      default.replication.factor: 1
+      min.insync.replicas: 1
+      auto.create.topics.enable: false
+      log.retention.hours: 24
+  entityOperator:
+    topicOperator:
+      resources:
+        requests:
+          cpu: 50m
+          memory: 256Mi
+        limits:
+          memory: 384Mi
+    # userOperator omitido a propósito (sin KafkaUser/ACL en este experimento).
+  # Kafka Exporter: expone kafka_consumergroup_lag(_sum) en :9404 (lo scrapea el agente Prometheus -> CloudWatch).
+  kafkaExporter:
+    groupRegex: "ms-process-billing.*"
+    topicRegex: "voltera[.].*"
+    resources:
+      requests:
+        cpu: 20m
+        memory: 64Mi
+      limits:
+        memory: 128Mi

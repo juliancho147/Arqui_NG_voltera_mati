@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kafka
+  labels:
+    proyecto: voltera
+    experimento: exp2-eda
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: voltera
+  labels:
+    proyecto: voltera
+    experimento: exp2-eda

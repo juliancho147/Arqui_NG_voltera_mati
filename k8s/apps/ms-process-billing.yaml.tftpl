@@ -1,0 +1,118 @@
+# ms-process-billing: receptor Kafka (dedup, armado) y puente hacia SQS. Escalado por KEDA (1..${max_replicas}).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ${service_account}
+  namespace: ${namespace}
+  # Credenciales AWS por EKS Pod Identity (asociación creada en el stack cluster); sin anotaciones.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ms-process-billing
+  namespace: ${namespace}
+  labels:
+    app.kubernetes.io/name: ms-process-billing
+spec:
+  # Sin "replicas": las gestiona KEDA (HPA).
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ms-process-billing
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ms-process-billing
+    spec:
+      serviceAccountName: ${service_account}
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: ms-process-billing
+          image: ${image}
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: AWS_REGION
+              value: ${region}
+            - name: AWS_DEFAULT_REGION
+              value: ${region}
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: ${kafka_bootstrap}
+            - name: KAFKA_TOPIC_INGRESO
+              value: ${topic_ingreso}
+            - name: KAFKA_TOPIC_EVENTOS
+              value: ${topic_eventos}
+            - name: KAFKA_CONSUMER_GROUP
+              value: ${consumer_group}
+            - name: SCHEMA_REGISTRY_URL
+              value: ${schema_registry_url}
+            - name: SQS_QUEUE_URL
+              value: ${sqs_queue_url}
+            - name: TABLE_PROCESS_BILLING
+              value: ${table_process_billing}
+            - name: SIMULATED_DELAY_SECONDS
+              value: "${simulated_delay_seconds}"
+            - name: HEALTH_PORT
+              value: "8080"
+            - name: METRICS_BACKEND
+              value: ${metrics_backend}
+            - name: CLOUDWATCH_NAMESPACE
+              value: ${cloudwatch_namespace}
+            - name: METRICS_FLUSH_SECONDS
+              value: "${metrics_flush_seconds}"
+          readinessProbe:
+            httpGet:
+              path: ${health_path}
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: ${health_path}
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ms-process-billing
+  namespace: ${namespace}
+spec:
+  selector:
+    app.kubernetes.io/name: ms-process-billing
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: ms-process-billing
+  namespace: ${namespace}
+spec:
+  scaleTargetRef:
+    name: ms-process-billing
+  minReplicaCount: ${min_replicas}
+  maxReplicaCount: ${max_replicas}
+  pollingInterval: ${polling_interval}
+  cooldownPeriod: ${cooldown_period}
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: ${kafka_bootstrap}
+        consumerGroup: ${consumer_group}
+        topic: ${topic_ingreso}
+        lagThreshold: "${lag_threshold}"
+        activationLagThreshold: "0"
+        offsetResetPolicy: earliest
+        allowIdleConsumers: "false"
+        scaleToZeroOnInvalidOffset: "false"

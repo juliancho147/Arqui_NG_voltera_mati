@@ -1,0 +1,43 @@
+# MirrorMaker2 billing -> dominios. Replica voltera.eventos como "billing.voltera.eventos" en "dominios"
+# (política de réplica por defecto: prefijo con el alias de origen). Permite añadir consumidores en "dominios"
+# sin tocar el flujo de billing. Se ejecuta contra el clúster destino (Connect worker en "dominios").
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaMirrorMaker2
+metadata:
+  name: billing-to-dominios
+  namespace: ${namespace}
+spec:
+  version: ${kafka_version}
+  replicas: 1
+  resources:
+    requests:
+      cpu: 250m
+      memory: 768Mi
+    limits:
+      memory: 1Gi
+  jvmOptions:
+    -Xms: 384m
+    -Xmx: 384m
+  target:
+    alias: dominios
+    bootstrapServers: dominios-kafka-bootstrap.${namespace}.svc:9092
+    groupId: mm2-billing-to-dominios
+    configStorageTopic: mm2-configs
+    offsetStorageTopic: mm2-offsets
+    statusStorageTopic: mm2-status
+    config:
+      config.storage.replication.factor: 1
+      offset.storage.replication.factor: 1
+      status.storage.replication.factor: 1
+  mirrors:
+    - source:
+        alias: billing
+        bootstrapServers: billing-kafka-bootstrap.${namespace}.svc:9092
+      topicsPattern: "${mirror_topics_pattern}"
+      sourceConnector:
+        tasksMax: 1
+        config:
+          replication.factor: 1
+          offset-syncs.topic.replication.factor: 1
+          sync.topic.acls.enabled: "false"
+          refresh.topics.interval.seconds: 30

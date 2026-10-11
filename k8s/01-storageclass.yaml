@@ -1,0 +1,13 @@
+# StorageClass para los PVC de Kafka. reclaimPolicy: Delete => al borrarse el PVC se borra el PV y el
+# volumen EBS (evita volúmenes huérfanos). WaitForFirstConsumer => el volumen se crea en la AZ del nodo.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3-delete
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+  encrypted: "true"
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true

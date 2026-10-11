@@ -1,0 +1,6 @@
+# Workaround: kafka-clients solo vive en el classloader del plugin (plugin/storage/kafka) y Kafka resuelve
+# ByteArraySerializer via el context classloader -> ConfigException al arrancar. Copiarlo a lib/ lo arregla.
+FROM eventmesh-spike:local
+USER root
+RUN cp plugin/storage/kafka/kafka-clients-*.jar plugin/storage/kafka/lz4-java-*.jar plugin/storage/kafka/snappy-java-*.jar plugin/storage/kafka/zstd-jni-*.jar lib/
+USER eventmesh

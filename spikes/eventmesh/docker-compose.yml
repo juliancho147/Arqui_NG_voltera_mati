@@ -1,0 +1,34 @@
+# Spike LOCAL: EventMesh (develop 2.0.0-SNAPSHOT, imagen construida desde fuente) sobre Kafka KRaft.
+# Build previo: docker build -f docker/Dockerfile -t eventmesh-spike:kafkafix <ruta-al-clon>
+services:
+  kafka:
+    image: apache/kafka:3.9.0
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    ports: ["29092:29092"]
+  eventmesh-a:
+    image: eventmesh-spike:kafkafix
+    depends_on: [kafka]
+    environment:
+      EVENTMESH_STORAGE_TYPE: kafka
+      JAVA_OPTS: "-Deventmesh.admin.token=spike-token -Deventmesh.ws.port=10107 -Deventmesh.grpc.port=10205"
+    volumes: ["./conf/eventmesh.properties:/data/app/eventmesh/conf/eventmesh.properties:ro"]
+    ports: ["10105:10105", "10106:10106", "10205:10205"]
+  eventmesh-b:
+    image: eventmesh-spike:kafkafix
+    depends_on: [kafka]
+    environment:
+      EVENTMESH_STORAGE_TYPE: kafka
+      JAVA_OPTS: "-Deventmesh.admin.token=spike-token"
+    volumes: ["./conf/eventmesh.properties:/data/app/eventmesh/conf/eventmesh.properties:ro"]
+    ports: ["20105:10105", "20106:10106"]

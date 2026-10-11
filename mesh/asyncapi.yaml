@@ -1,0 +1,679 @@
+asyncapi: 3.0.0
+info:
+  title: Voltera - Event Mesh (Experimentación 2)
+  version: 1.0.0
+  description: |
+    Catálogo de eventos del Event Mesh de Voltera. Data plane: Apache Kafka (Strimzi, KRaft) en EKS.
+    Control plane: CRDs de Strimzi (KafkaTopic, KafkaMirrorMaker2), Apicurio Registry (esquemas) y este archivo.
+
+    Convenciones:
+    - Formato: CloudEvents 1.0 en modo ESTRUCTURADO, JSON (content-type application/cloudevents+json).
+    - Clave del registro Kafka = facturaId. Headers Kafka obligatorios: cicloId, facturaId.
+    - Todo evento lleva cicloId y facturaId (en headers, en los atributos de extensión cicloid/facturaid
+      y en data). Los eventos de nivel ciclo (CicloDeFacturacionIniciado, ProcesoDeFacturacion*) usan el
+      valor centinela facturaId = "CICLO" [SUPUESTO a confirmar].
+    - Los eventos llevan referencias (ids), no datos pesados (viven en DynamoDB).
+  tags:
+    - name: exp2-eda
+servers:
+  billing:
+    host: billing-kafka-bootstrap.kafka.svc:9092
+    protocol: kafka
+    description: Clúster Kafka "billing" (núcleo del flujo). Acceso interno al clúster; sin TLS ni auth (TODO).
+  billingVpc:
+    host: BILLING_NLB_INTERNO:9094
+    protocol: kafka
+    description: Mismo clúster vía NLB interno de la VPC (outbox-relay). El host se obtiene con scripts/kafka-relay-bootstrap.sh.
+  dominios:
+    host: dominios-kafka-bootstrap.kafka.svc:9092
+    protocol: kafka
+    description: Clúster Kafka "dominios" (reportes / tiempo real). Recibe réplica vía KafkaMirrorMaker2.
+channels:
+  consumoFacturablePreparado:
+    address: voltera.consumo-facturable-preparado
+    servers:
+      - $ref: '#/servers/billing'
+      - $ref: '#/servers/billingVpc'
+    description: Ingreso durable y replayable. >= 5 particiones (>= réplicas máximas de KEDA).
+    messages:
+      ConsumoFacturablePreparado:
+        $ref: '#/components/messages/ConsumoFacturablePreparado'
+    bindings:
+      kafka:
+        partitions: 5
+        replicas: 1
+  eventos:
+    address: voltera.eventos
+    servers:
+      - $ref: '#/servers/billing'
+    description: Eventos de dominio del flujo de facturación (observabilidad y correlación).
+    messages:
+      CicloDeFacturacionIniciado:
+        $ref: '#/components/messages/CicloDeFacturacionIniciado'
+      TarifaValidada:
+        $ref: '#/components/messages/TarifaValidada'
+      TarifaRechazada:
+        $ref: '#/components/messages/TarifaRechazada'
+      CargoEnergeticoCalculado:
+        $ref: '#/components/messages/CargoEnergeticoCalculado'
+      CalculoDeCargoRechazado:
+        $ref: '#/components/messages/CalculoDeCargoRechazado'
+      FacturaEmitida:
+        $ref: '#/components/messages/FacturaEmitida'
+      EmisionDeFacturaRechazada:
+        $ref: '#/components/messages/EmisionDeFacturaRechazada'
+      NotificacionRegistrada:
+        $ref: '#/components/messages/NotificacionRegistrada'
+      FacturaNotificada:
+        $ref: '#/components/messages/FacturaNotificada'
+      NotificacionFallida:
+        $ref: '#/components/messages/NotificacionFallida'
+      ProcesoDeFacturacionCompletado:
+        $ref: '#/components/messages/ProcesoDeFacturacionCompletado'
+      ProcesoDeFacturacionFallido:
+        $ref: '#/components/messages/ProcesoDeFacturacionFallido'
+    bindings:
+      kafka:
+        partitions: 3
+        replicas: 1
+  eventosDominios:
+    address: billing.voltera.eventos
+    servers:
+      - $ref: '#/servers/dominios'
+    description: Réplica de voltera.eventos en el clúster "dominios" (MirrorMaker2, prefijo = alias de origen). Mismos mensajes.
+    messages:
+      CicloDeFacturacionIniciado:
+        $ref: '#/components/messages/CicloDeFacturacionIniciado'
+      TarifaValidada:
+        $ref: '#/components/messages/TarifaValidada'
+      TarifaRechazada:
+        $ref: '#/components/messages/TarifaRechazada'
+      CargoEnergeticoCalculado:
+        $ref: '#/components/messages/CargoEnergeticoCalculado'
+      CalculoDeCargoRechazado:
+        $ref: '#/components/messages/CalculoDeCargoRechazado'
+      FacturaEmitida:
+        $ref: '#/components/messages/FacturaEmitida'
+      EmisionDeFacturaRechazada:
+        $ref: '#/components/messages/EmisionDeFacturaRechazada'
+      NotificacionRegistrada:
+        $ref: '#/components/messages/NotificacionRegistrada'
+      FacturaNotificada:
+        $ref: '#/components/messages/FacturaNotificada'
+      NotificacionFallida:
+        $ref: '#/components/messages/NotificacionFallida'
+      ProcesoDeFacturacionCompletado:
+        $ref: '#/components/messages/ProcesoDeFacturacionCompletado'
+      ProcesoDeFacturacionFallido:
+        $ref: '#/components/messages/ProcesoDeFacturacionFallido'
+operations:
+  publicarConsumoFacturablePreparado:
+    action: send
+    channel:
+      $ref: '#/channels/consumoFacturablePreparado'
+    summary: outbox-relay publica desde el outbox (Transactional Outbox)
+    messages:
+      - $ref: '#/channels/consumoFacturablePreparado/messages/ConsumoFacturablePreparado'
+  consumirConsumoFacturablePreparado:
+    action: receive
+    channel:
+      $ref: '#/channels/consumoFacturablePreparado'
+    summary: ms-process-billing consume (KEDA escala por lag)
+    messages:
+      - $ref: '#/channels/consumoFacturablePreparado/messages/ConsumoFacturablePreparado'
+  publicarEventosDeDominio:
+    action: send
+    channel:
+      $ref: '#/channels/eventos'
+    summary: Cada microservicio publica sus eventos de dominio (ver productor en cada mensaje)
+    messages:
+      - $ref: '#/channels/eventos/messages/CicloDeFacturacionIniciado'
+      - $ref: '#/channels/eventos/messages/TarifaValidada'
+      - $ref: '#/channels/eventos/messages/TarifaRechazada'
+      - $ref: '#/channels/eventos/messages/CargoEnergeticoCalculado'
+      - $ref: '#/channels/eventos/messages/CalculoDeCargoRechazado'
+      - $ref: '#/channels/eventos/messages/FacturaEmitida'
+      - $ref: '#/channels/eventos/messages/EmisionDeFacturaRechazada'
+      - $ref: '#/channels/eventos/messages/NotificacionRegistrada'
+      - $ref: '#/channels/eventos/messages/FacturaNotificada'
+      - $ref: '#/channels/eventos/messages/NotificacionFallida'
+      - $ref: '#/channels/eventos/messages/ProcesoDeFacturacionCompletado'
+      - $ref: '#/channels/eventos/messages/ProcesoDeFacturacionFallido'
+  consumirEventosEnProcessBilling:
+    action: receive
+    channel:
+      $ref: '#/channels/eventos'
+    summary: ms-process-billing los consume para emitir ProcesoDeFacturacionCompletado/Fallido
+    messages:
+      - $ref: '#/channels/eventos/messages/CicloDeFacturacionIniciado'
+      - $ref: '#/channels/eventos/messages/TarifaValidada'
+      - $ref: '#/channels/eventos/messages/TarifaRechazada'
+      - $ref: '#/channels/eventos/messages/CargoEnergeticoCalculado'
+      - $ref: '#/channels/eventos/messages/CalculoDeCargoRechazado'
+      - $ref: '#/channels/eventos/messages/FacturaEmitida'
+      - $ref: '#/channels/eventos/messages/EmisionDeFacturaRechazada'
+      - $ref: '#/channels/eventos/messages/NotificacionRegistrada'
+      - $ref: '#/channels/eventos/messages/FacturaNotificada'
+      - $ref: '#/channels/eventos/messages/NotificacionFallida'
+      - $ref: '#/channels/eventos/messages/ProcesoDeFacturacionCompletado'
+      - $ref: '#/channels/eventos/messages/ProcesoDeFacturacionFallido'
+  consumirEventosEnDominios:
+    action: receive
+    channel:
+      $ref: '#/channels/eventosDominios'
+    summary: Consumidores de otros dominios (reportes, tiempo real) - agregables sin tocar billing
+    messages:
+      - $ref: '#/channels/eventosDominios/messages/CicloDeFacturacionIniciado'
+      - $ref: '#/channels/eventosDominios/messages/TarifaValidada'
+      - $ref: '#/channels/eventosDominios/messages/TarifaRechazada'
+      - $ref: '#/channels/eventosDominios/messages/CargoEnergeticoCalculado'
+      - $ref: '#/channels/eventosDominios/messages/CalculoDeCargoRechazado'
+      - $ref: '#/channels/eventosDominios/messages/FacturaEmitida'
+      - $ref: '#/channels/eventosDominios/messages/EmisionDeFacturaRechazada'
+      - $ref: '#/channels/eventosDominios/messages/NotificacionRegistrada'
+      - $ref: '#/channels/eventosDominios/messages/FacturaNotificada'
+      - $ref: '#/channels/eventosDominios/messages/NotificacionFallida'
+      - $ref: '#/channels/eventosDominios/messages/ProcesoDeFacturacionCompletado'
+      - $ref: '#/channels/eventosDominios/messages/ProcesoDeFacturacionFallido'
+components:
+  messages:
+    CicloDeFacturacionIniciado:
+      name: CicloDeFacturacionIniciado
+      title: CicloDeFacturacionIniciado
+      summary: El cierre de mes arrancó. facturaId = valor centinela CICLO (evento de nivel ciclo).
+      description: "Productor: ms-orchestrator-billing."
+      contentType: application/cloudevents+json
+      headers:
+        $ref: '#/components/schemas/KafkaHeaders'
+      bindings:
+        kafka:
+          key:
+            type: string
+            description: facturaId
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventBase'
+          - type: object
+            properties:
+              type:
+                const: com.voltera.facturacion.ciclo-de-facturacion-iniciado.v1
+              data:
+                $ref: '#/components/schemas/CicloDeFacturacionIniciadoData'
+    ConsumoFacturablePreparado:
+      name: ConsumoFacturablePreparado
+      title: ConsumoFacturablePreparado
+      summary: Una unidad de facturación está lista. Viaja por el tópico de ingreso; los datos pesados viven en DynamoDB (transacciones).
+      description: "Productor: outbox-relay (origen: ms-orchestrator-billing)."
+      contentType: application/cloudevents+json
+      headers:
+        $ref: '#/components/schemas/KafkaHeaders'
+      bindings:
+        kafka:
+          key:
+            type: string
+            description: facturaId
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventBase'
+          - type: object
+            properties:
+              type:
+                const: com.voltera.facturacion.consumo-facturable-preparado.v1
+              data:
+                $ref: '#/components/schemas/ConsumoFacturablePreparadoData'
+    TarifaValidada:
+      name: TarifaValidada
+      title: TarifaValidada
+      summary: La tarifa de la factura fue validada.
+      description: "Productor: ms-tarifas."
+      contentType: application/cloudevents+json
+      headers:
+        $ref: '#/components/schemas/KafkaHeaders'
+      bindings:
+        kafka:
+          key:
+            type: string
+            description: facturaId
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventBase'
+          - type: object
+            properties:
+              type:
+                const: com.voltera.facturacion.tarifa-validada.v1
+              data:
+                $ref: '#/components/schemas/TarifaValidadaData'
+    TarifaRechazada:
+      name: TarifaRechazada
+      title: TarifaRechazada
+      summary: La tarifa no pasó la validación.
+      description: "Productor: ms-tarifas."
+      contentType: application/cloudevents+json
+      headers:
+        $ref: '#/components/schemas/KafkaHeaders'
+      bindings:
+        kafka:
+          key:
+            type: string
+            description: facturaId
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventBase'
+          - type: object
+            properties:
+              type:
+                const: com.voltera.facturacion.tarifa-rechazada.v1
+              data:
+                $ref: '#/components/schemas/TarifaRechazadaData'
+    CargoEnergeticoCalculado:
+      name: CargoEnergeticoCalculado
+      title: CargoEnergeticoCalculado
+      summary: Se calculó el cargo energético.
+      description: "Productor: ms-calculo-consumo-neto."
+      contentType: application/cloudevents+json
+      headers:
+        $ref: '#/components/schemas/KafkaHeaders'
+      bindings:
+        kafka:
+          key:
+            type: string
+            description: facturaId
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventBase'
+          - type: object
+            properties:
+              type:
+                const: com.voltera.facturacion.cargo-energetico-calculado.v1
+              data:
+                $ref: '#/components/schemas/CargoEnergeticoCalculadoData'
+    CalculoDeCargoRechazado:
+      name: CalculoDeCargoRechazado
+      title: CalculoDeCargoRechazado
+      summary: "No se pudo calcular el cargo (en el plan: CálculoDeCargoRechazado)."
+      description: "Productor: ms-calculo-consumo-neto."
+      contentType: application/cloudevents+json
+      headers:
+        $ref: '#/components/schemas/KafkaHeaders'
+      bindings:
+        kafka:
+          key:
+            type: string
+            description: facturaId
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventBase'
+          - type: object
+            properties:
+              type:
+                const: com.voltera.facturacion.calculo-de-cargo-rechazado.v1
+              data:
+                $ref: '#/components/schemas/CalculoDeCargoRechazadoData'
+    FacturaEmitida:
+      name: FacturaEmitida
+      title: FacturaEmitida
+      summary: La factura fue emitida (idempotente por facturaId).
+      description: "Productor: ms-facturacion."
+      contentType: application/cloudevents+json
+      headers:
+        $ref: '#/components/schemas/KafkaHeaders'
+      bindings:
+        kafka:
+          key:
+            type: string
+            description: facturaId
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventBase'
+          - type: object
+            properties:
+              type:
+                const: com.voltera.facturacion.factura-emitida.v1
+              data:
+                $ref: '#/components/schemas/FacturaEmitidaData'
+    EmisionDeFacturaRechazada:
+      name: EmisionDeFacturaRechazada
+      title: EmisionDeFacturaRechazada
+      summary: La emisión fue rechazada.
+      description: "Productor: ms-facturacion."
+      contentType: application/cloudevents+json
+      headers:
+        $ref: '#/components/schemas/KafkaHeaders'
+      bindings:
+        kafka:
+          key:
+            type: string
+            description: facturaId
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventBase'
+          - type: object
+            properties:
+              type:
+                const: com.voltera.facturacion.emision-de-factura-rechazada.v1
+              data:
+                $ref: '#/components/schemas/EmisionDeFacturaRechazadaData'
+    NotificacionRegistrada:
+      name: NotificacionRegistrada
+      title: NotificacionRegistrada
+      summary: Se registró la solicitud de notificación.
+      description: "Productor: ms-comprobante-factura."
+      contentType: application/cloudevents+json
+      headers:
+        $ref: '#/components/schemas/KafkaHeaders'
+      bindings:
+        kafka:
+          key:
+            type: string
+            description: facturaId
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventBase'
+          - type: object
+            properties:
+              type:
+                const: com.voltera.facturacion.notificacion-registrada.v1
+              data:
+                $ref: '#/components/schemas/NotificacionRegistradaData'
+    FacturaNotificada:
+      name: FacturaNotificada
+      title: FacturaNotificada
+      summary: El tercero (simulado) confirmó la notificación.
+      description: "Productor: ms-comprobante-factura."
+      contentType: application/cloudevents+json
+      headers:
+        $ref: '#/components/schemas/KafkaHeaders'
+      bindings:
+        kafka:
+          key:
+            type: string
+            description: facturaId
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventBase'
+          - type: object
+            properties:
+              type:
+                const: com.voltera.facturacion.factura-notificada.v1
+              data:
+                $ref: '#/components/schemas/FacturaNotificadaData'
+    NotificacionFallida:
+      name: NotificacionFallida
+      title: NotificacionFallida
+      summary: La notificación falló.
+      description: "Productor: ms-comprobante-factura."
+      contentType: application/cloudevents+json
+      headers:
+        $ref: '#/components/schemas/KafkaHeaders'
+      bindings:
+        kafka:
+          key:
+            type: string
+            description: facturaId
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventBase'
+          - type: object
+            properties:
+              type:
+                const: com.voltera.facturacion.notificacion-fallida.v1
+              data:
+                $ref: '#/components/schemas/NotificacionFallidaData'
+    ProcesoDeFacturacionCompletado:
+      name: ProcesoDeFacturacionCompletado
+      title: ProcesoDeFacturacionCompletado
+      summary: Todas las unidades del ciclo terminaron. facturaId = CICLO.
+      description: "Productor: ms-process-billing."
+      contentType: application/cloudevents+json
+      headers:
+        $ref: '#/components/schemas/KafkaHeaders'
+      bindings:
+        kafka:
+          key:
+            type: string
+            description: facturaId
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventBase'
+          - type: object
+            properties:
+              type:
+                const: com.voltera.facturacion.proceso-de-facturacion-completado.v1
+              data:
+                $ref: '#/components/schemas/ProcesoDeFacturacionCompletadoData'
+    ProcesoDeFacturacionFallido:
+      name: ProcesoDeFacturacionFallido
+      title: ProcesoDeFacturacionFallido
+      summary: El ciclo no pudo completarse. facturaId = CICLO.
+      description: "Productor: ms-process-billing."
+      contentType: application/cloudevents+json
+      headers:
+        $ref: '#/components/schemas/KafkaHeaders'
+      bindings:
+        kafka:
+          key:
+            type: string
+            description: facturaId
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventBase'
+          - type: object
+            properties:
+              type:
+                const: com.voltera.facturacion.proceso-de-facturacion-fallido.v1
+              data:
+                $ref: '#/components/schemas/ProcesoDeFacturacionFallidoData'
+  schemas:
+    KafkaHeaders:
+      type: object
+      required: [cicloId, facturaId]
+      properties:
+        cicloId:
+          type: string
+          description: Identificador del ciclo de facturación.
+        facturaId:
+          type: string
+          description: Identificador de la factura (o CICLO en eventos de nivel ciclo). Igual a la clave del registro.
+        content-type:
+          type: string
+          const: application/cloudevents+json; charset=UTF-8
+    CloudEventBase:
+      type: object
+      description: CloudEvents 1.0, modo estructurado, JSON, con atributos de extensión de correlación.
+      required: [specversion, id, source, type, time, subject, datacontenttype, cicloid, facturaid, data]
+      properties:
+        specversion:
+          type: string
+          const: "1.0"
+        id:
+          type: string
+          description: Único por evento (UUID); base de la deduplicación.
+        source:
+          type: string
+          description: "Microservicio productor, p. ej. /voltera/ms-tarifas."
+        type:
+          type: string
+          pattern: '^com\.voltera\.facturacion\..+\.v[0-9]+$'
+        time:
+          type: string
+          format: date-time
+        subject:
+          type: string
+          description: facturaId.
+        datacontenttype:
+          type: string
+          const: application/json
+        cicloid:
+          type: string
+          description: Extensión CloudEvents (cicloId). Obligatoria.
+        facturaid:
+          type: string
+          description: Extensión CloudEvents (facturaId). Obligatoria.
+        traceparent:
+          type: string
+          description: Extensión opcional de trazabilidad W3C.
+        data:
+          type: object
+    CorrelationData:
+      type: object
+      required: [cicloId, facturaId]
+      properties:
+        cicloId:
+          type: string
+        facturaId:
+          type: string
+    CicloDeFacturacionIniciadoData:
+      allOf:
+        - $ref: '#/components/schemas/CorrelationData'
+        - type: object
+          required: [totalUnidades]
+          properties:
+            totalUnidades:
+              type: integer
+              description: Cantidad de facturas que debe esperar ms-process-billing.
+            iniciadoEn:
+              type: string
+              description: Instante de inicio del ciclo (date-time).
+              format: date-time
+    ConsumoFacturablePreparadoData:
+      allOf:
+        - $ref: '#/components/schemas/CorrelationData'
+        - type: object
+          properties:
+            ordinal:
+              type: integer
+              description: Posición dentro del ciclo.
+            totalUnidades:
+              type: integer
+              description: Total de unidades del ciclo.
+            clienteId:
+              type: string
+              description: Opcional.
+            tipoTarifa:
+              type: string
+              description: Opcional.
+            periodo:
+              type: string
+              description: Opcional.
+            retardoSegundos:
+              type: number
+              description: Opcional.
+    TarifaValidadaData:
+      allOf:
+        - $ref: '#/components/schemas/CorrelationData'
+        - type: object
+          properties:
+            tipoTarifa:
+              type: string
+              description: Opcional.
+            valorKwh:
+              type: number
+              description: Opcional.
+    TarifaRechazadaData:
+      allOf:
+        - $ref: '#/components/schemas/CorrelationData'
+        - type: object
+          required: [motivo]
+          properties:
+            motivo:
+              type: string
+              description: Causa del rechazo.
+    CargoEnergeticoCalculadoData:
+      allOf:
+        - $ref: '#/components/schemas/CorrelationData'
+        - type: object
+          properties:
+            valorCargo:
+              type: number
+              description: Valor del cargo energético.
+            moneda:
+              type: string
+              description: Código ISO 4217.
+            consumoNetoKwh:
+              type: number
+              description: Opcional.
+    CalculoDeCargoRechazadoData:
+      allOf:
+        - $ref: '#/components/schemas/CorrelationData'
+        - type: object
+          required: [motivo]
+          properties:
+            motivo:
+              type: string
+              description: Causa del rechazo.
+    FacturaEmitidaData:
+      allOf:
+        - $ref: '#/components/schemas/CorrelationData'
+        - type: object
+          properties:
+            numeroFactura:
+              type: string
+              description: Número asignado.
+            valorTotal:
+              type: number
+              description: Opcional.
+    EmisionDeFacturaRechazadaData:
+      allOf:
+        - $ref: '#/components/schemas/CorrelationData'
+        - type: object
+          required: [motivo]
+          properties:
+            motivo:
+              type: string
+              description: Causa del rechazo.
+    NotificacionRegistradaData:
+      allOf:
+        - $ref: '#/components/schemas/CorrelationData'
+        - type: object
+    FacturaNotificadaData:
+      allOf:
+        - $ref: '#/components/schemas/CorrelationData'
+        - type: object
+    NotificacionFallidaData:
+      allOf:
+        - $ref: '#/components/schemas/CorrelationData'
+        - type: object
+          required: [motivo]
+          properties:
+            motivo:
+              type: string
+              description: Causa del fallo.
+            intento:
+              type: integer
+              description: Número de intento.
+            definitivo:
+              type: boolean
+              description: Opcional.
+    ProcesoDeFacturacionCompletadoData:
+      allOf:
+        - $ref: '#/components/schemas/CorrelationData'
+        - type: object
+          required: [emitidas]
+          properties:
+            emitidas:
+              type: integer
+              description: Facturas emitidas.
+            rechazadas:
+              type: integer
+              description: Facturas rechazadas.
+            fallidas:
+              type: integer
+              description: Opcional.
+            totalUnidades:
+              type: integer
+              description: Opcional.
+    ProcesoDeFacturacionFallidoData:
+      allOf:
+        - $ref: '#/components/schemas/CorrelationData'
+        - type: object
+          required: [motivo]
+          properties:
+            motivo:
+              type: string
+              description: Causa del fallo.
+            fallidas:
+              type: integer
+              description: Opcional.
+            totalUnidades:
+              type: integer
+              description: Opcional.
