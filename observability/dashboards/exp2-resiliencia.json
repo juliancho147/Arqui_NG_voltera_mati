@@ -1,0 +1,2332 @@
+{
+  "uid": "voltera-exp2-resiliencia",
+  "title": "Exp2 - Resiliencia ante fallos",
+  "description": "Un solo escenario: cae un dependiente, mueren pods, falla una Lambda y se reenvian duplicados; el ingreso no se cae y el saldo vuelve a 0. Pensado para grabar.",
+  "tags": [
+    "voltera",
+    "exp2",
+    "exp2",
+    "video"
+  ],
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "graphTooltip": 1,
+  "refresh": "5s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m"
+    ]
+  },
+  "timezone": "browser",
+  "fiscalYearStartMonth": 0,
+  "liveNow": false,
+  "templating": {
+    "list": [
+      {
+        "type": "textbox",
+        "name": "cicloId",
+        "label": "cicloId",
+        "query": ".",
+        "current": {
+          "text": ".",
+          "value": "."
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": ".",
+            "value": "."
+          }
+        ],
+        "description": "Regex sobre cicloId para Logs Insights; '.' = todos los ciclos. Las metricas EMF no llevan cicloId (dimension no disponible).",
+        "hide": 0
+      },
+      {
+        "type": "query",
+        "name": "sfn",
+        "label": "State machine",
+        "datasource": {
+          "type": "cloudwatch",
+          "uid": "cloudwatch"
+        },
+        "query": {
+          "queryType": "dimensionValues",
+          "region": "default",
+          "namespace": "AWS/States",
+          "metricName": "ExecutionsStarted",
+          "dimensionKey": "StateMachineArn",
+          "dimensionFilters": {},
+          "refId": "VarSfn"
+        },
+        "regex": "/.*voltera-exp2-facturacion$/",
+        "refresh": 2,
+        "includeAll": false,
+        "multi": false,
+        "sort": 0,
+        "hide": 0,
+        "current": {},
+        "options": []
+      }
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      },
+      {
+        "datasource": {
+          "type": "datasource",
+          "uid": "-- Dashboard --"
+        },
+        "enable": true,
+        "iconColor": "gray",
+        "name": "Estado inicial",
+        "filter": {
+          "exclude": false,
+          "ids": [
+            12
+          ]
+        },
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
+        "mappings": {
+          "title": {
+            "source": "text",
+            "value": "Estado inicial"
+          }
+        }
+      },
+      {
+        "datasource": {
+          "type": "datasource",
+          "uid": "-- Dashboard --"
+        },
+        "enable": true,
+        "iconColor": "orange",
+        "name": "Disparo",
+        "filter": {
+          "exclude": false,
+          "ids": [
+            13
+          ]
+        },
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
+        "mappings": {
+          "title": {
+            "source": "text",
+            "value": "Disparo"
+          }
+        }
+      },
+      {
+        "datasource": {
+          "type": "datasource",
+          "uid": "-- Dashboard --"
+        },
+        "enable": true,
+        "iconColor": "red",
+        "name": "Fallo del dependiente",
+        "filter": {
+          "exclude": false,
+          "ids": [
+            14
+          ]
+        },
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
+        "mappings": {
+          "title": {
+            "source": "text",
+            "value": "Fallo del dependiente"
+          }
+        }
+      },
+      {
+        "datasource": {
+          "type": "datasource",
+          "uid": "-- Dashboard --"
+        },
+        "enable": true,
+        "iconColor": "purple",
+        "name": "Pods muertos",
+        "filter": {
+          "exclude": false,
+          "ids": [
+            15
+          ]
+        },
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
+        "mappings": {
+          "title": {
+            "source": "text",
+            "value": "Pods muertos"
+          }
+        }
+      },
+      {
+        "datasource": {
+          "type": "datasource",
+          "uid": "-- Dashboard --"
+        },
+        "enable": true,
+        "iconColor": "yellow",
+        "name": "Fallo en Lambda",
+        "filter": {
+          "exclude": false,
+          "ids": [
+            16
+          ]
+        },
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
+        "mappings": {
+          "title": {
+            "source": "text",
+            "value": "Fallo en Lambda"
+          }
+        }
+      },
+      {
+        "datasource": {
+          "type": "datasource",
+          "uid": "-- Dashboard --"
+        },
+        "enable": true,
+        "iconColor": "blue",
+        "name": "Duplicados reenviados",
+        "filter": {
+          "exclude": false,
+          "ids": [
+            17
+          ]
+        },
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
+        "mappings": {
+          "title": {
+            "source": "text",
+            "value": "Duplicados reenviados"
+          }
+        }
+      },
+      {
+        "datasource": {
+          "type": "datasource",
+          "uid": "-- Dashboard --"
+        },
+        "enable": true,
+        "iconColor": "green",
+        "name": "Recuperacion",
+        "filter": {
+          "exclude": false,
+          "ids": [
+            18
+          ]
+        },
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
+        "mappings": {
+          "title": {
+            "source": "text",
+            "value": "Recuperacion"
+          }
+        }
+      }
+    ]
+  },
+  "links": [
+    {
+      "type": "dashboards",
+      "tags": [
+        "voltera"
+      ],
+      "asDropdown": true,
+      "title": "Dashboards Voltera",
+      "includeVars": false,
+      "keepTime": true
+    }
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "ms-process-billing: el ingreso, no se cae",
+      "description": "Qué mirar: ms-process-billing recibe las facturas (el ingreso) y debe decir EN LINEA durante TODO el escenario, incluso al matar sus pods y al caer el dependiente. Patrón de arquitectura: Bulkhead: el fallo de un componente queda aislado; productor y consumidor desacoplados por mensajeria asincrona.",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 1,
+          "expression": "MIN(SEARCH('{Voltera/Exp2,pod,service} MetricName=\"HealthCheckOk\" service=\"ms-process-billing\"', 'Minimum', 60))",
+          "id": "",
+          "period": "60",
+          "region": "default",
+          "label": "disponibilidad",
+          "hide": false,
+          "namespace": "",
+          "metricName": "",
+          "dimensions": {},
+          "statistic": "Average",
+          "matchExact": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "noValue": "0",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "EN LINEA",
+                  "color": "green"
+                },
+                "0": {
+                  "text": "CAIDO",
+                  "color": "red"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "center",
+        "text": {
+          "valueSize": 72,
+          "titleSize": 20
+        }
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Servicio que se cae: fallas por minuto (ms-comprobante-factura / ms-tarifas)",
+      "description": "Qué mirar: sube de 0 solo en la fase 'fallo_dependiente': ms-comprobante-factura (caso B) o ms-tarifas (caso A). Es el dependiente que se cae; el resto sigue. Patrón de arquitectura: Bulkhead + Retry con backoff: el error queda en un solo dependiente y se reintenta antes de ir a la DLQ.",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "FallaInyectada",
+          "dimensions": {
+            "service": "ms-comprobante-factura"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "",
+          "expression": "",
+          "label": "ms-comprobante-factura",
+          "hide": false
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "B",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "FallaInyectada",
+          "dimensions": {
+            "service": "ms-tarifas"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "",
+          "expression": "",
+          "label": "ms-tarifas (caso A)",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "max"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "center",
+        "text": {
+          "valueSize": 72,
+          "titleSize": 20
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Facturas emitidas por ms-facturacion",
+      "description": "Qué mirar: el contador no se congela durante los fallos: el flujo sigue facturando y termina con todas las facturas. Patrón de arquitectura: Bulkhead + Outbox: lo inyectado queda registrado y el flujo avanza aunque algo falle.",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "FacturasEmitidas",
+          "dimensions": {
+            "service": "ms-facturacion"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "",
+          "expression": "",
+          "label": "emitidas",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "sum"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "center",
+        "text": {
+          "valueSize": 72,
+          "titleSize": 20
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "SALDO de conservacion: inyectadas - (emitidas + rechazadas + DLQ)",
+      "description": "Qué mirar: 0 (verde) = cero perdida. Naranja mientras hay trabajo en vuelo durante los fallos; debe volver a 0 tras 'recuperacion'. Rojo (negativo) = se contaron de mas. Patrón de arquitectura: DLQ + Idempotencia + Outbox: at-least-once sin perder ni duplicar facturas.",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "UnidadesEnOutbox",
+          "dimensions": {
+            "service": "ms-orchestrator-billing"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "inj",
+          "expression": "",
+          "label": "inyectadas",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "B",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "FacturasEmitidas",
+          "dimensions": {
+            "service": "ms-facturacion"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "em",
+          "expression": "",
+          "label": "emitidas",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "C",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "TarifasRechazadas",
+          "dimensions": {
+            "service": "ms-tarifas"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "rt",
+          "expression": "",
+          "label": "rech_tarifa",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "D",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "CalculosRechazados",
+          "dimensions": {
+            "service": "ms-calculo-consumo-neto"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "rc",
+          "expression": "",
+          "label": "rech_calculo",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "E",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "EmisionesRechazadas",
+          "dimensions": {
+            "service": "ms-facturacion"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "re",
+          "expression": "",
+          "label": "rech_emision",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "F",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "AWS/SQS",
+          "metricName": "ApproximateNumberOfMessagesVisible",
+          "dimensions": {
+            "QueueName": "voltera-exp2-transacciones-dlq"
+          },
+          "statistic": "Maximum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "dlq",
+          "expression": "",
+          "label": "dlq",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "G",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 1,
+          "expression": "RUNNING_SUM(FILL(inj,0)) - RUNNING_SUM(FILL(em,0)) - RUNNING_SUM(FILL(rt,0)) - RUNNING_SUM(FILL(rc,0)) - RUNNING_SUM(FILL(re,0)) - FILL(dlq,0)",
+          "id": "saldo",
+          "period": "60",
+          "region": "default",
+          "label": "saldo (en vuelo + perdidas)",
+          "hide": false,
+          "namespace": "",
+          "metricName": "",
+          "dimensions": {},
+          "statistic": "Average",
+          "matchExact": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "center",
+        "text": {
+          "valueSize": 96,
+          "titleSize": 20
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "state-timeline",
+      "title": "Estado de los servicios en el tiempo (eje X: hora; una fila por servicio)",
+      "description": "Qué mirar: cada fila es un servicio y el color dice su estado minuto a minuto: verde OK, amarillo DEGRADADO, rojo OFF. Se espera: todo OK; ms-comprobante-factura OFF (fallo_dependiente); ms-process-billing DEGRADADO (fallo_pod); ms-facturacion DEGRADADO (fallo_lambda); todo OK en la recuperacion. Reglas. Lambdas (por minuto): OFF si hay throttles o errores >= invocaciones (FORCE_FAIL / concurrencia 0); DEGRADADO si hay errores pero menos que invocaciones (FAIL_RATE); OK si no hay errores (sin invocaciones cuenta como OK). ms-process-billing: OFF si 0 pods o HealthCheckOk=0; DEGRADADO si bajan los pods respecto al minuto anterior o hay MensajesReenviados>0 (pods muertos); OK en otro caso. Limites: ms-process-billing no tiene linea base de pods, por eso 'degradado' se infiere de la caida de pods o de reentregas (un escalado KEDA hacia abajo tambien se veria amarillo); con el minuto como resolucion minima, fallos de menos de 1 min se difuminan. Metrica minima recomendada: que ms-process-billing emita PodsEsperados (Gauge) para comparar contra los pods vivos. Patrón de arquitectura: Bulkhead + observabilidad del aislamiento: se ve que un servicio cae y los demas siguen.",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 6
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "Hp",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "ContainerInsights",
+          "metricName": "service_number_of_running_pods",
+          "dimensions": {
+            "ClusterName": "voltera-exp2-eph",
+            "Namespace": "voltera",
+            "Service": "ms-process-billing"
+          },
+          "statistic": "Maximum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "pods",
+          "expression": "",
+          "label": "pods",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "Hh",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 1,
+          "expression": "MIN(SEARCH('{Voltera/Exp2,pod,service} MetricName=\"HealthCheckOk\" service=\"ms-process-billing\"', 'Minimum', 60))",
+          "id": "hc",
+          "period": "60",
+          "region": "default",
+          "label": "salud",
+          "hide": true,
+          "namespace": "",
+          "metricName": "",
+          "dimensions": {},
+          "statistic": "Average",
+          "matchExact": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "Hr",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "MensajesReenviados",
+          "dimensions": {
+            "service": "ms-process-billing"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "re",
+          "expression": "",
+          "label": "reenvios",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "H",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 1,
+          "expression": "IF(FILL(pods,0)==0 || FILL(hc,1)==0, 0, IF(RATE(pods)<0 || FILL(re,0)>0, 1, 2))",
+          "id": "",
+          "period": "60",
+          "region": "default",
+          "label": "ms-process-billing",
+          "hide": false,
+          "namespace": "",
+          "metricName": "",
+          "dimensions": {},
+          "statistic": "Average",
+          "matchExact": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "E1",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "FallaInyectada",
+          "dimensions": {
+            "service": "ms-tarifas"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "e1",
+          "expression": "",
+          "label": "fallas_ms-tarifas",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "I1",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "AWS/Lambda",
+          "metricName": "Invocations",
+          "dimensions": {
+            "FunctionName": "voltera-exp2-ms-tarifas"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "i1",
+          "expression": "",
+          "label": "inv_ms-tarifas",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "T1",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "AWS/Lambda",
+          "metricName": "Throttles",
+          "dimensions": {
+            "FunctionName": "voltera-exp2-ms-tarifas"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "t1",
+          "expression": "",
+          "label": "thr_ms-tarifas",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "L1",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 1,
+          "expression": "IF(FILL(t1,0)>0 || (FILL(e1,0)>0 && FILL(e1,0)>=FILL(i1,0)), 0, IF(FILL(e1,0)>0, 1, 2))",
+          "id": "",
+          "period": "60",
+          "region": "default",
+          "label": "ms-tarifas",
+          "hide": false,
+          "namespace": "",
+          "metricName": "",
+          "dimensions": {},
+          "statistic": "Average",
+          "matchExact": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "E2",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "FallaInyectada",
+          "dimensions": {
+            "service": "ms-calculo-consumo-neto"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "e2",
+          "expression": "",
+          "label": "fallas_ms-calculo-consumo-neto",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "I2",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "AWS/Lambda",
+          "metricName": "Invocations",
+          "dimensions": {
+            "FunctionName": "voltera-exp2-ms-calculo-consumo-neto"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "i2",
+          "expression": "",
+          "label": "inv_ms-calculo-consumo-neto",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "T2",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "AWS/Lambda",
+          "metricName": "Throttles",
+          "dimensions": {
+            "FunctionName": "voltera-exp2-ms-calculo-consumo-neto"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "t2",
+          "expression": "",
+          "label": "thr_ms-calculo-consumo-neto",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "L2",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 1,
+          "expression": "IF(FILL(t2,0)>0 || (FILL(e2,0)>0 && FILL(e2,0)>=FILL(i2,0)), 0, IF(FILL(e2,0)>0, 1, 2))",
+          "id": "",
+          "period": "60",
+          "region": "default",
+          "label": "ms-calculo-consumo-neto",
+          "hide": false,
+          "namespace": "",
+          "metricName": "",
+          "dimensions": {},
+          "statistic": "Average",
+          "matchExact": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "E3",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "FallaInyectada",
+          "dimensions": {
+            "service": "ms-facturacion"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "e3",
+          "expression": "",
+          "label": "fallas_ms-facturacion",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "I3",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "AWS/Lambda",
+          "metricName": "Invocations",
+          "dimensions": {
+            "FunctionName": "voltera-exp2-ms-facturacion"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "i3",
+          "expression": "",
+          "label": "inv_ms-facturacion",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "T3",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "AWS/Lambda",
+          "metricName": "Throttles",
+          "dimensions": {
+            "FunctionName": "voltera-exp2-ms-facturacion"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "t3",
+          "expression": "",
+          "label": "thr_ms-facturacion",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "L3",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 1,
+          "expression": "IF(FILL(t3,0)>0 || (FILL(e3,0)>0 && FILL(e3,0)>=FILL(i3,0)), 0, IF(FILL(e3,0)>0, 1, 2))",
+          "id": "",
+          "period": "60",
+          "region": "default",
+          "label": "ms-facturacion",
+          "hide": false,
+          "namespace": "",
+          "metricName": "",
+          "dimensions": {},
+          "statistic": "Average",
+          "matchExact": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "E4",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "FallaInyectada",
+          "dimensions": {
+            "service": "ms-comprobante-factura"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "e4",
+          "expression": "",
+          "label": "fallas_ms-comprobante-factura",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "I4",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "AWS/Lambda",
+          "metricName": "Invocations",
+          "dimensions": {
+            "FunctionName": "voltera-exp2-ms-comprobante-factura"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "i4",
+          "expression": "",
+          "label": "inv_ms-comprobante-factura",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "T4",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "AWS/Lambda",
+          "metricName": "Throttles",
+          "dimensions": {
+            "FunctionName": "voltera-exp2-ms-comprobante-factura"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "t4",
+          "expression": "",
+          "label": "thr_ms-comprobante-factura",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "L4",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 1,
+          "expression": "IF(FILL(t4,0)>0 || (FILL(e4,0)>0 && FILL(e4,0)>=FILL(i4,0)), 0, IF(FILL(e4,0)>0, 1, 2))",
+          "id": "",
+          "period": "60",
+          "region": "default",
+          "label": "ms-comprobante-factura",
+          "hide": false,
+          "namespace": "",
+          "metricName": "",
+          "dimensions": {},
+          "statistic": "Average",
+          "matchExact": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "2": {
+                  "text": "OK",
+                  "color": "green",
+                  "index": 0
+                },
+                "1": {
+                  "text": "DEGRADADO",
+                  "color": "yellow",
+                  "index": 1
+                },
+                "0": {
+                  "text": "OFF",
+                  "color": "red",
+                  "index": 2
+                }
+              }
+            }
+          ],
+          "color": {
+            "mode": "thresholds"
+          },
+          "min": 0,
+          "max": 2,
+          "noValue": "OK",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "green",
+                "value": 2
+              }
+            ]
+          },
+          "custom": {
+            "fillOpacity": 85,
+            "lineWidth": 0
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "mergeValues": true,
+        "showValue": "auto",
+        "alignValue": "center",
+        "rowHeight": 0.85,
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "A) Facturas emitidas vs notificadas (acumuladas): emitir no espera a notificar  (eje X: hora)",
+      "description": "Qué mirar: 'emitidas' sigue subiendo aunque ms-comprobante-factura este caido; 'notificadas' se aplana en el fallo y alcanza a 'emitidas' tras la recuperacion. Patrón de arquitectura: Bulkhead + desacople por cola: la emision no espera a la notificacion. Eje Y: Facturas acumuladas. Eje X: tiempo (hora local).",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 15
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "Am",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "FacturasEmitidas",
+          "dimensions": {
+            "service": "ms-facturacion"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "e",
+          "expression": "",
+          "label": "emitidas (ms-facturacion)",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 1,
+          "expression": "RUNNING_SUM(FILL(e,0))",
+          "id": "",
+          "period": "60",
+          "region": "default",
+          "label": "emitidas (ms-facturacion)",
+          "hide": false,
+          "namespace": "",
+          "metricName": "",
+          "dimensions": {},
+          "statistic": "Average",
+          "matchExact": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "Bm",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "FacturasNotificadas",
+          "dimensions": {
+            "service": "ms-comprobante-factura"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "n",
+          "expression": "",
+          "label": "notificadas (ms-comprobante-factura)",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "B",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 1,
+          "expression": "RUNNING_SUM(FILL(n,0))",
+          "id": "",
+          "period": "60",
+          "region": "default",
+          "label": "notificadas (ms-comprobante-factura)",
+          "hide": false,
+          "namespace": "",
+          "metricName": "",
+          "dimensions": {},
+          "statistic": "Average",
+          "matchExact": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "axisLabel": "Facturas acumuladas",
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "B) DLQ: mensajes apartados por servicio  (eje X: hora)",
+      "description": "Qué mirar: solo las DLQ, que son las que se acumulan: en 'fallo_dependiente' y 'fallo_lambda' suben las del servicio que falla; en 'recuperacion' vuelven a 0 tras el redrive. Nada se pierde: se aparta. Patrón de arquitectura: Retry con backoff + DLQ: lo que no se procesa se aparta sin perderse y sin frenar al resto. Eje Y: Mensajes en la DLQ. Eje X: tiempo (hora local).",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 15
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "AWS/SQS",
+          "metricName": "ApproximateNumberOfMessagesVisible",
+          "dimensions": {
+            "QueueName": "voltera-exp2-transacciones-dlq"
+          },
+          "statistic": "Maximum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "",
+          "expression": "",
+          "label": "DLQ transacciones (ms-tarifas / ms-calculo-consumo-neto / ms-facturacion)",
+          "hide": false
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "B",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "AWS/SQS",
+          "metricName": "ApproximateNumberOfMessagesVisible",
+          "dimensions": {
+            "QueueName": "voltera-exp2-comprobantes-dlq"
+          },
+          "statistic": "Maximum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "",
+          "expression": "",
+          "label": "DLQ comprobantes (ms-comprobante-factura)",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "axisLabel": "Mensajes en la DLQ",
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "C) Pods de ms-process-billing y mensajes reenviados tras la muerte de un pod  (eje X: hora)",
+      "description": "Qué mirar: en 'fallo_pod' los pods bajan y Kubernetes los repone; los mensajes que tenian en mano se reentregan (MensajesReenviados > 0) y se procesan igual. Patrón de arquitectura: Entrega at-least-once (Kafka no confirma hasta terminar) + replicas: el ingreso se recupera solo. Eje izq: reenvios; eje der: pods. Eje Y: Mensajes reenviados por minuto. Eje X: tiempo (hora local).",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "ContainerInsights",
+          "metricName": "service_number_of_running_pods",
+          "dimensions": {
+            "ClusterName": "voltera-exp2-eph",
+            "Namespace": "voltera",
+            "Service": "ms-process-billing"
+          },
+          "statistic": "Maximum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "",
+          "expression": "",
+          "label": "ms-process-billing: pods en ejecucion",
+          "hide": false
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "B",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "MensajesReenviados",
+          "dimensions": {
+            "service": "ms-process-billing"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "",
+          "expression": "",
+          "label": "MensajesReenviados (reentregas de Kafka)",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "axisLabel": "Mensajes reenviados por minuto",
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ms-process-billing: pods en ejecucion"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Pods de ms-process-billing"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 3
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "D) Duplicados reenviados a proposito y descartados por idempotencia  (eje X: hora)",
+      "description": "Qué mirar: estas series valen 0 en todo el escenario SALVO en la fase 'duplicados' (copias reenviadas por SQS y Kafka a proposito): ahi suben, pero las facturas emitidas NO se duplican y el saldo sigue en 0. Patrón de arquitectura: Idempotencia: el consumidor reconoce lo ya procesado y lo descarta (dedup en el ingreso, Powertools idempotency en facturacion y comprobante). Eje Y: Duplicados por minuto. Eje X: tiempo (hora local).",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "MensajesDuplicados",
+          "dimensions": {
+            "service": "ms-process-billing"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "",
+          "expression": "",
+          "label": "duplicados descartados en el ingreso (ms-process-billing)",
+          "hide": false
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "B",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "IdempotenciaReplays",
+          "dimensions": {
+            "service": "ms-facturacion"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "",
+          "expression": "",
+          "label": "replays ignorados en ms-facturacion",
+          "hide": false
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "C",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "IdempotenciaReplays",
+          "dimensions": {
+            "service": "ms-comprobante-factura"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "",
+          "expression": "",
+          "label": "replays ignorados en ms-comprobante-factura",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "axisLabel": "Duplicados por minuto",
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "E) Fallas inyectadas por servicio y errores de Step Functions  (eje X: hora)",
+      "description": "Qué mirar: las fallas inyectadas (metrica FallaInyectada) suben en 'fallo_dependiente' y 'fallo_lambda' (son los reintentos); 'fallidas' de Step Functions casi no se mueve porque el Catch manda a la DLQ y la ejecucion termina bien. Patrón de arquitectura: Retry con backoff exponencial y Catch hacia DLQ en la orquestacion (Saga / Step Functions). Eje Y: Fallas por minuto. Eje X: tiempo (hora local).",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 33
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 1,
+          "expression": "SEARCH('{Voltera/Exp2,service} MetricName=\"FallaInyectada\"', 'Sum', 60)",
+          "id": "",
+          "period": "60",
+          "region": "default",
+          "label": "fallas inyectadas: ${PROP('Dim.service')}",
+          "hide": false,
+          "namespace": "",
+          "metricName": "",
+          "dimensions": {},
+          "statistic": "Average",
+          "matchExact": true
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "B",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "AWS/States",
+          "metricName": "ExecutionsFailed",
+          "dimensions": {
+            "StateMachineArn": "$sfn"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "",
+          "expression": "",
+          "label": "Step Functions: ejecuciones fallidas",
+          "hide": false
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "C",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "AWS/States",
+          "metricName": "ExecutionsTimedOut",
+          "dimensions": {
+            "StateMachineArn": "$sfn"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "",
+          "expression": "",
+          "label": "Step Functions: ejecuciones con timeout",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "axisLabel": "Fallas por minuto",
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "row",
+      "title": "Fuente de anotaciones (FaseExperimento; no se explica)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 41
+      },
+      "panels": []
+    },
+    {
+      "id": 12,
+      "type": "table",
+      "title": "Marca: Estado inicial",
+      "description": "CloudWatch Voltera/Exp2/FaseExperimento experimento=exp2 fase=estado_inicial. Cada punto dibuja la anotacion 'Estado inicial'.",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 8,
+        "x": 0,
+        "y": 42
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "FaseExperimento",
+          "dimensions": {
+            "experimento": "exp2",
+            "fase": "estado_inicial"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "",
+          "expression": "",
+          "label": "estado_inicial",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      }
+    },
+    {
+      "id": 13,
+      "type": "table",
+      "title": "Marca: Disparo",
+      "description": "CloudWatch Voltera/Exp2/FaseExperimento experimento=exp2 fase=disparo. Cada punto dibuja la anotacion 'Disparo'.",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 8,
+        "x": 8,
+        "y": 42
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "FaseExperimento",
+          "dimensions": {
+            "experimento": "exp2",
+            "fase": "disparo"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "",
+          "expression": "",
+          "label": "disparo",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      }
+    },
+    {
+      "id": 14,
+      "type": "table",
+      "title": "Marca: Fallo del dependiente",
+      "description": "CloudWatch Voltera/Exp2/FaseExperimento experimento=exp2 fase=fallo_dependiente. Cada punto dibuja la anotacion 'Fallo del dependiente'.",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 8,
+        "x": 16,
+        "y": 42
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "FaseExperimento",
+          "dimensions": {
+            "experimento": "exp2",
+            "fase": "fallo_dependiente"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "",
+          "expression": "",
+          "label": "fallo_dependiente",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      }
+    },
+    {
+      "id": 15,
+      "type": "table",
+      "title": "Marca: Pods muertos",
+      "description": "CloudWatch Voltera/Exp2/FaseExperimento experimento=exp2 fase=fallo_pod. Cada punto dibuja la anotacion 'Pods muertos'.",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 8,
+        "x": 0,
+        "y": 45
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "FaseExperimento",
+          "dimensions": {
+            "experimento": "exp2",
+            "fase": "fallo_pod"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "",
+          "expression": "",
+          "label": "fallo_pod",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      }
+    },
+    {
+      "id": 16,
+      "type": "table",
+      "title": "Marca: Fallo en Lambda",
+      "description": "CloudWatch Voltera/Exp2/FaseExperimento experimento=exp2 fase=fallo_lambda. Cada punto dibuja la anotacion 'Fallo en Lambda'.",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 8,
+        "x": 8,
+        "y": 45
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "FaseExperimento",
+          "dimensions": {
+            "experimento": "exp2",
+            "fase": "fallo_lambda"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "",
+          "expression": "",
+          "label": "fallo_lambda",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      }
+    },
+    {
+      "id": 17,
+      "type": "table",
+      "title": "Marca: Duplicados reenviados",
+      "description": "CloudWatch Voltera/Exp2/FaseExperimento experimento=exp2 fase=duplicados. Cada punto dibuja la anotacion 'Duplicados reenviados'.",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 8,
+        "x": 16,
+        "y": 45
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "FaseExperimento",
+          "dimensions": {
+            "experimento": "exp2",
+            "fase": "duplicados"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "",
+          "expression": "",
+          "label": "duplicados",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      }
+    },
+    {
+      "id": 18,
+      "type": "table",
+      "title": "Marca: Recuperacion",
+      "description": "CloudWatch Voltera/Exp2/FaseExperimento experimento=exp2 fase=recuperacion. Cada punto dibuja la anotacion 'Recuperacion'.",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 8,
+        "x": 0,
+        "y": 48
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "refId": "A",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "namespace": "Voltera/Exp2",
+          "metricName": "FaseExperimento",
+          "dimensions": {
+            "experimento": "exp2",
+            "fase": "recuperacion"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "region": "default",
+          "matchExact": true,
+          "id": "",
+          "expression": "",
+          "label": "recuperacion",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      }
+    }
+  ]
+}
