@@ -3,7 +3,11 @@
 > Para volver a levantar todo desde cero, ejecutar las pruebas y volver a apagar sin dejar sobrecostos.
 > Escrita el 2026-10-10 a partir de la primera sesión real de despliegue. Todos los comandos se ejecutan desde la carpeta `codigo_fuente_voltera/` salvo que se indique otra cosa.
 
-## 0. Estado actual (2026-10-10, ~13:00 hora Bogotá)
+## 0. Estado actual (2026-10-11, ~14:50 hora Bogotá; segunda sesión cerrada)
+
+> Segunda sesión (2026-10-11): desplegada, usada para Exp. 1 y Exp. 2 (unificado) y **dada de baja de nuevo**. El borrado del efímero no dejó huérfanos esta vez. Lecciones nuevas en §4 (filas marcadas *2026-10-11*). Para las pruebas usa `experiments/README.md` (`python3 correr.py ...`).
+
+### Estado de la primera sesión (2026-10-10)
 
 **Toda la infraestructura de AWS está dada de baja.** Verificado con consultas independientes:
 
@@ -224,6 +228,15 @@ aws ec2 describe-volumes --filters Name=status,Values=available --query 'Volumes
 | Métricas del pod ausentes en CloudWatch | El EMF por stdout del pod no se extrae | `METRICS_BACKEND=cloudwatch` + permiso `cloudwatch:PutMetricData` |
 | Lag inflado en el panel | CloudWatch suma las 6 muestras por minuto (flush de 10 s) | El panel usa `Sum / 6` |
 | Borrado del clúster muy lento | ENI y SG huérfanos | Sección 3 |
+| *2026-10-11* `ms-process-billing` se reiniciaba en bucle durante el Exp. 2 | El `commit` del offset fallaba con `ILLEGAL_GENERATION` en un rebalance y mataba el hilo consumidor; la sonda de salud devolvía 503 | `services/ms-process-billing/consumer.py` (`commit_seguro`) |
+| *2026-10-11* Lote de 1500 facturas incompleto (1308 llegaron a Kafka) | `ms-orchestrator-billing` (30 s) escribía el outbox con `PutItem` secuenciales y se agotaba | Escritura en paralelo (`OUTBOX_WORKERS`) y `orchestrator_timeout_seconds` = 300 |
+| *2026-10-11* Apicurio en `CrashLoopBackOff` | Container Insights inyecta `OTEL_PROPAGATORS=xray`, que Apicurio no soporta | `k8s/apicurio/apicurio.yaml.tftpl` |
+| *2026-10-11* Pods nuevos tardaban ~30 s en arrancar | Cuatro init-containers de auto-instrumentación no usados | Anotaciones `instrumentation.opentelemetry.io/inject-*: "false"` en `ms-process-billing.yaml.tftpl` |
+| *2026-10-11* Reducción de pods tardaba ~5 min | La ventana de estabilización del HPA es 300 s por defecto | `advanced.horizontalPodAutoscalerConfig.behavior.scaleDown` = 30 s en el ScaledObject |
+| *2026-10-11* Grafana sin datos | Clave y secreto de acceso quedaron en la misma línea de `aws/credentials` | Escribirlos en líneas separadas |
+| *2026-10-11* Timeline de estado de servicios vacío o siempre verde | Sintaxis `=`/`OR` no válida en CloudWatch (usar `==`/`||`) y `Errors` de Lambda vale 0 en fallos por registro | Métrica `FallaInyectada` (libs/voltera_common/faults.py) |
+| *2026-10-11* DLQ de transacciones no se reprocesaba | `StartMessageMoveTask` no mueve mensajes que Step Functions escribe directo en la DLQ | `experiments/runner/runner/actions.py` (redrive manual de respaldo) |
+| *2026-10-11* DLQ de comprobantes se llenaba tras ~3 min | 3 intentos × 40 s de visibilidad | Perfil rápido: `infra/terraform/base/experiment.tfvars` (10 s, 2 intentos, timeout 8 s) |
 
 ## 5. Cuidados de costo
 - El stack efímero cuesta ≈ 0,30–0,33 USD/h (EKS 0,10 + 2 × t3.large 0,17 + NLB interno 0,02 + endpoints de interfaz 0,02). **Un olvido de un mes serían ~195 USD.**

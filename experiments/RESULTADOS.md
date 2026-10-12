@@ -298,6 +298,14 @@ Caso B:
 - **Acciones derivadas:** (completar tras revisar la grabacion)
 
 ---
+## Cierre de la sesión 2026-10-11 — baja de la infraestructura
+- **Fecha/hora:** ~14:35 → 14:50 (Bogotá). Orden: Lambdas fuera de la VPC (base) → `scripts/destroy-ephemeral.sh --yes` → destrucción del base (55 recursos) → usuario IAM de Grafana y Grafana local.
+- **Resultado:** verificado en 0: EKS, EC2, balanceadores, VPC, NAT, IP elásticas, Lambdas, tablas, colas SQS, ECR, Step Functions, usuarios y roles IAM de Voltera y log groups. Solo quedan los dos EBS de `matching-engine` (ajenos).
+- **Incidentes:** ninguno; el efímero se destruyó sin ENI ni SG huérfanos.
+- **Resumen de la sesión:** pruebas 2 (Exp. 1, N = 500: PASS, 116,6 s) y 5 (Exp. 2: 15 PASS, 1 FAIL por el redrive de la DLQ de transacciones). Detalle en `RESULTADOS-prueba2-prueba5.md`.
+
+---
+
 ## Plantilla para pruebas siguientes
 
 ```
