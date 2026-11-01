@@ -2,6 +2,8 @@
 
 Prueba de arquitectura (ARTI4208, Maestría en Arquitectura, Uniandes) del **cierre de facturación de fin de mes**: miles de facturas llegan a la vez y el sistema debe absorber el pico, aislar fallos y no perder ninguna solicitud. Se construye sobre AWS con 6 microservicios, un Event Mesh en Kafka y tres experimentos que se ejecutan con una línea y se observan en Grafana.
 
+> **Etapa 3 (mercado P2P con blockchain, en curso):** ver [`ETAPA3-BLOCKCHAIN.md`](ETAPA3-BLOCKCHAIN.md) para requisitos, instalación y estado.
+
 > Código de la experimentación anterior: [`_legacy/`](_legacy/) (se conserva, no se borra).
 
 ## Los experimentos

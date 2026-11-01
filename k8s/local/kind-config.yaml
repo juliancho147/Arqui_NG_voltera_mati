@@ -1,0 +1,13 @@
+# Clúster local de la etapa 3 (blockchain P2P). Un solo nodo para caber en Docker Desktop.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: voltera-local
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      - containerPort: 30080   # Istio Ingress Gateway (HTTP) -> http://localhost:8080
+        hostPort: 8080
+        protocol: TCP
+      - containerPort: 30545   # Anvil (JSON-RPC) -> http://localhost:8545, solo para depurar
+        hostPort: 8545
+        protocol: TCP

@@ -1,0 +1,79 @@
+# Dependencias locales de la etapa 3: cadena de prueba (Anvil), DynamoDB Local e IPFS (Kubo).
+# En AWS se reemplazan por: Ethereum Sepolia (Nodo RPC), Amazon DynamoDB y Pinata/IPFS.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: voltera
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: anvil, namespace: voltera}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: anvil}}
+  template:
+    metadata: {labels: {app: anvil}}
+    spec:
+      containers:
+        - name: anvil
+          image: ghcr.io/foundry-rs/foundry:latest
+          command: ["anvil"]
+          args: ["--host", "0.0.0.0", "--chain-id", "11155111", "--block-time", "2"]
+          ports: [{containerPort: 8545}]
+          resources: {requests: {memory: 64Mi}, limits: {memory: 256Mi}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: anvil, namespace: voltera}
+spec:
+  type: NodePort
+  selector: {app: anvil}
+  ports: [{port: 8545, targetPort: 8545, nodePort: 30545}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: dynamodb-local, namespace: voltera}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: dynamodb-local}}
+  template:
+    metadata: {labels: {app: dynamodb-local}}
+    spec:
+      containers:
+        - name: dynamodb
+          image: amazon/dynamodb-local:latest
+          args: ["-jar", "DynamoDBLocal.jar", "-inMemory", "-sharedDb"]
+          ports: [{containerPort: 8000}]
+          resources: {requests: {memory: 256Mi}, limits: {memory: 512Mi}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: dynamodb-local, namespace: voltera}
+spec:
+  selector: {app: dynamodb-local}
+  ports: [{port: 8000, targetPort: 8000}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: ipfs, namespace: voltera}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: ipfs}}
+  template:
+    metadata: {labels: {app: ipfs}}
+    spec:
+      containers:
+        - name: kubo
+          image: ipfs/kubo:latest
+          env: [{name: IPFS_PROFILE, value: "server"}]
+          ports: [{containerPort: 5001}, {containerPort: 8080}]
+          resources: {requests: {memory: 128Mi}, limits: {memory: 512Mi}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: ipfs, namespace: voltera}
+spec:
+  selector: {app: ipfs}
+  ports:
+    - {name: api, port: 5001, targetPort: 5001}
+    - {name: gateway, port: 8080, targetPort: 8080}
