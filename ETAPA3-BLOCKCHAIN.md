@@ -58,11 +58,28 @@ Sistemas: probado en macOS (Apple Silicon). En Windows use WSL2. En Linux, `host
 
 | Requisito | Para qué |
 |---|---|
-| Cuenta de AWS propia con permisos para EKS, DynamoDB, Secrets Manager, ECR, IAM, VPC | Desplegar los servicios en la nube. La etapa anterior usa la cuenta `767397902469`, región `us-east-1`; **otro usuario debe usar su propia cuenta** y ajustar los `*.tfvars` de [`infra/terraform/`](infra/terraform/). Ver [`REDESPLIEGUE.md`](REDESPLIEGUE.md) para AWS CLI, Terraform ≥ 1.6, alertas de costo y apagado. |
+| Cuenta de AWS **propia** con permisos para EKS, DynamoDB, Secrets Manager, ECR, IAM, VPC | Desplegar los servicios en la nube. Ver la sección 3.3 sobre cómo se asocian las variables a la cuenta. Para AWS CLI, Terraform ≥ 1.6, alertas de costo y apagado, ver [`REDESPLIEGUE.md`](REDESPLIEGUE.md). |
 | Billetera de prueba propia (no usar una con dinero real) | Firmar en Sepolia. La llave va a Secrets Manager o a un archivo local ignorado por git; **nunca** al repositorio ni a un chat. |
 | ETH de prueba de un faucet de Sepolia (≈ 0,1 ETH basta) | Pagar el gas de los despliegues y de las pocas transacciones de los experimentos. |
 | Nodo RPC de Sepolia (cuenta gratuita en Alchemy o Infura) | Conectarse a la red pública. |
 | Cuenta de pinning de IPFS (por ejemplo Pinata, plan gratuito) | Guardar los certificados PDF fuera de la cadena. En local se usa un nodo Kubo. |
+
+### 3.3 Las variables están ligadas a la cuenta de AWS del despliegue
+
+El repositorio **no** trae ningún ID de cuenta escrito. Terraform y los comandos toman la cuenta de las **credenciales de AWS activas** en quien despliega:
+
+```bash
+export AWS_REGION=us-east-1
+export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+```
+
+Consecuencias para quien replique el repositorio:
+
+- Todos los recursos (EKS, DynamoDB, ECR, IAM, Secrets Manager) se crean, y se cobran, en **su** cuenta, no en la de quien creó el repositorio.
+- Los comandos de las guías usan `$AWS_ACCOUNT_ID`; debe definirse en cada terminal nueva.
+- Cambian por cuenta, región o red: `AWS_REGION`, el ARN del layer de Powertools (depende de la región), su IP pública para el API de EKS (`public_access_cidrs`) y las subredes y el bootstrap de Kafka de cada sesión. Los valores de los `*.tfvars` de sesiones anteriores son solo ejemplos y no sirven en otra cuenta.
+- Las alertas de AWS Budgets no están en el código: cada cuenta debe crear las suyas antes de desplegar.
+- La llave de firma de Sepolia (etapa 3) también es por persona: cada quien usa su propia billetera de prueba.
 
 ## 4. Reproducir lo que existe (paso a paso)
 

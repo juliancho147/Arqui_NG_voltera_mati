@@ -31,19 +31,22 @@ Lo que se conserva en tu máquina: el código, los reportes en `experiments/repo
 
 | Herramienta | Notas |
 |---|---|
-| AWS CLI v2 con credenciales en la cuenta `767397902469` | Exporta `AWS_REGION=us-east-1` (el perfil por defecto no tiene región). |
+| AWS CLI v2 con credenciales de **tu propia cuenta de AWS** | Todo se crea en la cuenta a la que apuntan las credenciales activas (ver el recuadro de abajo). Exporta `AWS_REGION=us-east-1` (el perfil por defecto no tiene región). |
 | Terraform ≥ 1.6 | Los stacks usan estado **local**. |
 | kubectl, Docker Desktop con `buildx` | El daemon de Docker debe estar encendido. |
 | Python 3.12 | Venv del runner en `experiments/runner/.venv`; el script de seed lo reutiliza. |
 | Layer de Powertools | `arn:aws:lambda:us-east-1:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-arm64:38` (versión vigente el 2026-10-10; si cambia, busca la última con `aws lambda get-layer-version --layer-name <ARN> --version-number N`). |
 | Tu IP pública | Para restringir el API de EKS: `curl -s https://checkip.amazonaws.com`. |
 
+> **Las variables están ligadas a la cuenta de AWS del despliegue.** Ningún archivo de Terraform trae un ID de cuenta escrito: la cuenta sale de las credenciales activas (`aws sts get-caller-identity`). Los comandos de esta guía usan `$AWS_ACCOUNT_ID`; defínelo en cada terminal nueva como se muestra abajo. Si replicas el repositorio, los recursos se crearán y cobrarán en **tu** cuenta, y tendrás que crear tus propias alertas de AWS Budgets. Los valores que cambian por cuenta, región o red son: `AWS_REGION`, el ARN del layer de Powertools (depende de la región), tu IP pública para el API de EKS (`public_access_cidrs`) y las subredes o el bootstrap de Kafka de cada sesión (los `*.tfvars` de sesiones anteriores solo son ejemplos).
+
 Comprobaciones previas:
 
 ```bash
 export AWS_REGION=us-east-1
 aws sts get-caller-identity
-aws budgets describe-budgets --account-id 767397902469 --query 'Budgets[].BudgetName' --output text   # alertas de costo activas
+export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)   # tu cuenta; los pasos siguientes la usan
+aws budgets describe-budgets --account-id "$AWS_ACCOUNT_ID" --query 'Budgets[].BudgetName' --output text   # alertas de costo activas
 docker info >/dev/null && echo "docker ok"
 ```
 
@@ -80,8 +83,8 @@ Resultado esperado: 2 ejecuciones de Step Functions `SUCCEEDED`, colas en 0 y co
 ### Paso 4 — Imagen de `ms-process-billing` (**amd64**)
 Los nodos t3.large son x86: **no** subas la imagen arm64.
 ```bash
-REPO=767397902469.dkr.ecr.us-east-1.amazonaws.com/voltera-exp2/ms-process-billing
-aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 767397902469.dkr.ecr.us-east-1.amazonaws.com
+REPO=${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/voltera-exp2/ms-process-billing
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin "${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com"
 docker buildx build --platform linux/amd64 --provenance=false \
   -f services/ms-process-billing/Dockerfile -t "${REPO}:latest" --push .
 ```
@@ -138,7 +141,7 @@ Crear el usuario de solo lectura (detalle en `observability/README.md`):
 cd observability
 aws iam create-policy --policy-name voltera-grafana-readonly --policy-document file://iam/grafana-readonly-policy.json
 aws iam create-user --user-name voltera-grafana
-aws iam attach-user-policy --user-name voltera-grafana --policy-arn arn:aws:iam::767397902469:policy/voltera-grafana-readonly
+aws iam attach-user-policy --user-name voltera-grafana --policy-arn arn:aws:iam::${AWS_ACCOUNT_ID}:policy/voltera-grafana-readonly
 aws iam create-access-key --user-name voltera-grafana     # guarda la clave en aws/credentials (perfil [voltera-grafana]), permisos 600
 cp .env.example .env    # cambia GRAFANA_ADMIN_PASSWORD si no existe ya
 docker compose up -d    # http://localhost:3000   (usuario admin; la clave está en .env, archivo oculto)
@@ -193,9 +196,9 @@ cd ../../..
 
 # 4) IAM de Grafana y Grafana local
 aws iam delete-access-key --user-name voltera-grafana --access-key-id <ID>
-aws iam detach-user-policy --user-name voltera-grafana --policy-arn arn:aws:iam::767397902469:policy/voltera-grafana-readonly
+aws iam detach-user-policy --user-name voltera-grafana --policy-arn arn:aws:iam::${AWS_ACCOUNT_ID}:policy/voltera-grafana-readonly
 aws iam delete-user --user-name voltera-grafana
-aws iam delete-policy --policy-arn arn:aws:iam::767397902469:policy/voltera-grafana-readonly
+aws iam delete-policy --policy-arn arn:aws:iam::${AWS_ACCOUNT_ID}:policy/voltera-grafana-readonly
 (cd observability && docker compose down && rm -f aws/credentials)
 ```
 

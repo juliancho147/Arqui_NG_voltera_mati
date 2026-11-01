@@ -19,7 +19,7 @@ La infraestructura debe estar **desplegada** (cuesta ≈ 0,31 USD/h mientras est
 
 ```bash
 export AWS_REGION=us-east-1
-aws sts get-caller-identity --query Account --output text       # 767397902469
+aws sts get-caller-identity --query Account --output text       # tu ID de cuenta de AWS; debe ser la cuenta donde desplegaste
 kubectl -n voltera get pods                                      # ms-process-billing 1/1 Running
 kubectl -n kafka get kafka                                       # billing y dominios READY=True
 curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000/login   # Grafana: 200
@@ -181,7 +181,7 @@ Librería común `../libs/voltera_common/`: eventos CloudEvents, publicación al
 ## 9. Qué se requiere para montarlo
 
 ### Cuenta y permisos
-- Cuenta AWS (en este proyecto `767397902469`, región `us-east-1`) con permisos para crear EKS, EC2/VPC, IAM, DynamoDB, SQS, Lambda, Step Functions, EventBridge, ECR, CloudWatch y X-Ray.
+- Cuenta AWS (la tuya: los recursos se crean en la cuenta de las credenciales activas; región `us-east-1`) con permisos para crear EKS, EC2/VPC, IAM, DynamoDB, SQS, Lambda, Step Functions, EventBridge, ECR, CloudWatch y X-Ray.
 - Quedan fuera del código: **AWS Budgets** (alertas de 3 y 5 USD) y la política de gasto; revísalos antes de encender.
 
 ### Herramientas locales
