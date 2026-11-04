@@ -1,0 +1,2 @@
+# ms_oraculo usa solo la biblioteca estandar (http.server, urllib, json) para el servicio HTTP.
+# No requiere dependencias de ejecucion.

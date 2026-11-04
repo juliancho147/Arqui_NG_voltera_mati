@@ -1,1 +1,8 @@
 /_legacy
+# Credenciales y entorno local (nunca en el repo, R3.4)
+.env
+.env.*
+*.env
+
+# Almacen local de contenido direccionable de ms_certificado (fallback de Pinata, R3.3)
+.certificados-local/

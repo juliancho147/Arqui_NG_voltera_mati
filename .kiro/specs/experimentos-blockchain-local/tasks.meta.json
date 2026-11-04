@@ -1,0 +1,439 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 Crear la estructura del paquete runner blockchain y dependencias": [
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793757917449
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793757924851
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793758080099
+      }
+    ],
+    "1.2 Implementar el cliente de cadena común `chain_client`": [
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793757917514
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793758083455
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793758448100
+      }
+    ],
+    "2.1 Implementar el arranque de Anvil y el despliegue de contratos": [
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793757917552
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793758454989
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793758647029
+      }
+    ],
+    "2.2 Implementar el cargador de `deployment.json`": [
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793757917593
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793758659851
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793758828117
+      }
+    ],
+    "2.4 Documentar herramientas del entorno": [
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793757917635
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793758084600
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793758448851
+      }
+    ],
+    "3. Checkpoint - cadena y entorno listos": [
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793757917669
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793758866898
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793758869791
+      }
+    ],
+    "4.1 Implementar `ms_oraculo` con validación real y determinista": [
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793757917706
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793758894383
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793759325762
+      }
+    ],
+    "4.4 Implementar `ms_energia` con emisión idempotente por lectura": [
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793757917747
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793758895713
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793759327026
+      }
+    ],
+    "5.1 Implementar `ms_venta`": [
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793757917772
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793758897118
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793759328432
+      }
+    ],
+    "5.2 Implementar `ms_compra` con modo concurrente": [
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793757917803
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793758898517
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793759329399
+      }
+    ],
+    "6.1 Implementar el almacén de contenido direccionable y el cálculo de CIDv1": [
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793757917831
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793758456395
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793758645904
+      }
+    ],
+    "6.3 Implementar la integración con Pinata y el servicio de certificado": [
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793757917858
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793758899615
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793759330724
+      }
+    ],
+    "7. Checkpoint - microservicios listos": [
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793757917891
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793759619639
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793759622786
+      }
+    ],
+    "8.1 Implementar la lectura de eventos on-chain": [
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793757917925
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793759334599
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793759594819
+      }
+    ],
+    "9.1 Implementar la generación de casos y el flujo de E1": [
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793757917957
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793759629551
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793760037057
+      }
+    ],
+    "10.1 Implementar la generación de alteraciones y el flujo de E2": [
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793757917997
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793759631014
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793760035659
+      }
+    ],
+    "11.1 Implementar el flujo concurrente y las métricas de E3": [
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793757918072
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793759632049
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793760034411
+      }
+    ],
+    "12.1 Implementar el CLI del runner": [
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793757918117
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793760420027
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793761150099
+      }
+    ],
+    "12.2 Implementar el Reporte_Resultados (JSON + Markdown)": [
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793757918149
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793760050781
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793760419308
+      }
+    ],
+    "13.1 Cablear el flujo completo `all`": [
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793757918174
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793761154189
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793761850295
+      }
+    ],
+    "14. Checkpoint final - asegurar que todas las pruebas pasan": [
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793757918203
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793761876389
+      },
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793761880037
+      }
+    ],
+    "1. Preparar el esqueleto del proyecto y el cliente de cadena común": [
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793758448154
+      }
+    ],
+    "2. Implementar el orquestador del Entorno_Experimental y `deployment.json`": [
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793758828229
+      }
+    ],
+    "4. Implementar los microservicios de emisión (ms_oraculo, ms_energia)": [
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793759327062
+      }
+    ],
+    "5. Implementar los microservicios de mercado (ms_venta, ms_compra)": [
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793759329440
+      }
+    ],
+    "6. Implementar `ms_certificado` con Pinata y fallback de CID por contenido": [
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793759330750
+      }
+    ],
+    "8. Implementar el Lector_Eventos": [
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793759594883
+      }
+    ],
+    "11. Implementar E3 — Tokenización sin doble venta": [
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793760034507
+      }
+    ],
+    "10. Implementar E2 — Integridad del certificado": [
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793760035770
+      }
+    ],
+    "9. Implementar E1 — Integridad del Oracle": [
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793760037087
+      }
+    ],
+    "12. Implementar el Runner CLI y el Reporte_Resultados": [
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793761150151
+      }
+    ],
+    "13. Integración final y cableado extremo a extremo": [
+      {
+        "executionId": "98fc7081-f261-4c5c-83ee-a6e36ac81bb5",
+        "chatSessionId": "sess_251580f5-ac4d-437d-a5ba-cdff502f75d2",
+        "timestamp": 1793761850384
+      }
+    ]
+  }
+}

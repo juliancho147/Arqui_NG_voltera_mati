@@ -1,0 +1,5 @@
+# ms_compra toca la cadena via el chain_client comun del paquete runner_blockchain
+# (experiments/runner-blockchain/), que depende de web3 + eth-account. El transporte HTTP
+# usa solo la stdlib (http.server), por lo que no hay framework web aqui.
+web3>=6
+eth-account>=0.11
