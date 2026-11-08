@@ -20,7 +20,7 @@ BT
 14 TL
 (Certificado de compra de energia - Voltera) Tj
 T* (Oferta: 3) Tj
-T* (comprador: 0x000000000000000000000000000000000000A003) Tj
+T* (comprador: 0x0000000000000000000000000000000000000003) Tj
 T* (kwh: 103) Tj
 T* (ofertaId: 3) Tj
 T* (precio: 10) Tj
@@ -39,4 +39,7 @@ trailer
 << /Size 6 /Root 1 0 R >>
 startxref
 577
+
+% metadatos alterados
+<< /Producer (voltera-e2) /ModDate (D:00000000000003) /Alterado 360635 >>
 %%EOF

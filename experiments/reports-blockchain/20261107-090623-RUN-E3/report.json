@@ -1,0 +1,1297 @@
+{
+  "runId": "RUN-E3",
+  "verdict": "PASS",
+  "header": {
+    "runId": "RUN-E3",
+    "inicio": "2026-11-07T09:06:13-0500",
+    "fin": "2026-11-07T09:06:13-0500",
+    "cantidades": {
+      "E3": {
+        "comprasPorOferta": 10
+      }
+    },
+    "repeticiones": {
+      "E3": 10
+    },
+    "contratos": {
+      "EnergyToken": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+      "MarketEscrow": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+    },
+    "herramientas": {
+      "foundry": "forge 1.9.0"
+    },
+    "params": {
+      "seleccion": "e3",
+      "ofertas": 10,
+      "comprasPorOferta": 10,
+      "chainId": 11155111,
+      "rpcUrl": "http://localhost:8545"
+    }
+  },
+  "fronteraOnOffChain": {
+    "onChain": "Emision de tokens (EnergyToken.emitir -> Emitido), atomicidad de la venta (MarketEscrow.comprar -> Compra) y anclaje del CID (MarketEscrow.anclar -> Anclado). Firmado por la plataforma (modelo custodial).",
+    "offChain": "Validacion del oraculo (ms_oraculo), generacion/verificacion del certificado por contenido (ms_certificado, con Pinata real + fallback local) y la orquestacion/medicion del runner. Las APIs de medidor y clima son stub."
+  },
+  "experiments": [
+    {
+      "experiment": "E3",
+      "title": "E3 — Tokenizacion sin doble venta",
+      "hypothesis": "Bajo 100 compras concurrentes sobre una misma oferta Activa, el escrow confirma exactamente una venta y revierte el resto; repetido sobre 10 ofertas, no hay dobles ventas y los kWh tokenizados igualan a los validados.",
+      "started": "2026-11-07T09:06:13-0500",
+      "finished": "2026-11-07T09:06:13-0500",
+      "params": {
+        "runId": "RUN-E3",
+        "repeticiones": 10,
+        "comprasPorOferta": 10,
+        "kwhPorOferta": 100
+      },
+      "criteria": [
+        {
+          "id": "R4.1",
+          "title": "Se publicaron las 10 ofertas distintas y se dispararon las 100 compras concurrentes",
+          "status": "PASS",
+          "expected": "10 ofertas publicadas",
+          "observed": "10 publicadas, 0 fallidas",
+          "evidence": {}
+        },
+        {
+          "id": "R4.4",
+          "title": "Exactamente 1 evento Compra por oferta",
+          "status": "PASS",
+          "expected": "1 venta por oferta en todas las ofertas",
+          "observed": "10/10 ofertas con exactamente 1 venta",
+          "evidence": {
+            "ventasPorOferta": {
+              "53": 1,
+              "54": 1,
+              "55": 1,
+              "56": 1,
+              "57": 1,
+              "58": 1,
+              "59": 1,
+              "60": 1,
+              "61": 1,
+              "62": 1
+            }
+          }
+        },
+        {
+          "id": "R4.5",
+          "title": "Conteo total de dobles ventas igual a 0",
+          "status": "PASS",
+          "expected": "0 dobles ventas",
+          "observed": "0 dobles ventas",
+          "evidence": {}
+        },
+        {
+          "id": "R4.6",
+          "title": "Conservacion de kWh: tokenizados == validados (diff 0)",
+          "status": "PASS",
+          "expected": "diff absoluta 0 kWh (conservacion 100%)",
+          "observed": "tokenizados=1000, validados=1000, diff=0, conservacion=100.00%",
+          "evidence": {}
+        },
+        {
+          "id": "R4.7",
+          "title": "Gas consumido registrado por operacion on-chain",
+          "status": "PASS",
+          "expected": "gasUsed por operacion",
+          "observed": "20 operaciones con gas, gasTotal=5259128",
+          "evidence": {}
+        }
+      ],
+      "notes": [],
+      "data": {
+        "metricas": {
+          "ventasPorOferta": {
+            "53": 1,
+            "54": 1,
+            "55": 1,
+            "56": 1,
+            "57": 1,
+            "58": 1,
+            "59": 1,
+            "60": 1,
+            "61": 1,
+            "62": 1
+          },
+          "doblesVentas": 0,
+          "ofertasConUnaVenta": 10,
+          "kwhTokenizados": 1000,
+          "kwhValidados": 1000,
+          "diffKwh": 0,
+          "conservacionKwhPct": 100.0,
+          "gasTotal": 5259128,
+          "gasPorOperacion": [
+            {
+              "tipo": "Emitido",
+              "ofertaId": null,
+              "transactionHash": "0x76a7252433da10151c14ab90d2b51a5444f496ddb9ac6011952ca55960a89608",
+              "blockNumber": 410,
+              "gasUsed": 248388
+            },
+            {
+              "tipo": "Compra",
+              "ofertaId": 53,
+              "transactionHash": "0x9704c283b3ecaac71f4813738510d975328c305caf582b68fba1ecc6eabdeb83",
+              "blockNumber": 412,
+              "gasUsed": 277526
+            },
+            {
+              "tipo": "Emitido",
+              "ofertaId": null,
+              "transactionHash": "0x9703b340df99ebe4637b6e31ddc1dd1c0f1c4a507b3876ac347131c38eb6e847",
+              "blockNumber": 416,
+              "gasUsed": 248388
+            },
+            {
+              "tipo": "Compra",
+              "ofertaId": 54,
+              "transactionHash": "0x3ca34c3f06a9723850cc515ae282efb729ce5922907b8edb903d051b09692daa",
+              "blockNumber": 418,
+              "gasUsed": 277526
+            },
+            {
+              "tipo": "Emitido",
+              "ofertaId": null,
+              "transactionHash": "0x70faa85c050dad76894c7236cebb66dbea3e0c79d70ed26d7656d8bb1a6293d1",
+              "blockNumber": 421,
+              "gasUsed": 248388
+            },
+            {
+              "tipo": "Compra",
+              "ofertaId": 55,
+              "transactionHash": "0x4319b5174ba7276b5fe78498bffba621d58af854b7a5e09691bb3607d3a1ecef",
+              "blockNumber": 423,
+              "gasUsed": 277526
+            },
+            {
+              "tipo": "Emitido",
+              "ofertaId": null,
+              "transactionHash": "0xd58d4d354f0ab084d1c20ebcd30d1db29b5a2b78df00d0fb4baad9370ebf9ab9",
+              "blockNumber": 426,
+              "gasUsed": 248376
+            },
+            {
+              "tipo": "Compra",
+              "ofertaId": 56,
+              "transactionHash": "0xddebc626a8eb54dcc10d024e1130c363d2e2f4248775d73f30f18839590632ad",
+              "blockNumber": 428,
+              "gasUsed": 277526
+            },
+            {
+              "tipo": "Emitido",
+              "ofertaId": null,
+              "transactionHash": "0xfecf623e1f4550b5531115a974a92d432e70713d57b9bfeddd625dd858f7dcaf",
+              "blockNumber": 433,
+              "gasUsed": 248388
+            },
+            {
+              "tipo": "Compra",
+              "ofertaId": 57,
+              "transactionHash": "0xa8e251199fbae99e55e1862c96e5e1d22aae41febb647e4cd81cbe26f72203c5",
+              "blockNumber": 435,
+              "gasUsed": 277526
+            },
+            {
+              "tipo": "Emitido",
+              "ofertaId": null,
+              "transactionHash": "0x404c14b82440b00583075f10824cd82e32115b20a1efd487f9490df9404e7c84",
+              "blockNumber": 440,
+              "gasUsed": 248388
+            },
+            {
+              "tipo": "Compra",
+              "ofertaId": 58,
+              "transactionHash": "0xac31f0df6d050489f04277c2a7643184a2acd9ff87f9085dd04bfd9e77aa318f",
+              "blockNumber": 442,
+              "gasUsed": 277526
+            },
+            {
+              "tipo": "Emitido",
+              "ofertaId": null,
+              "transactionHash": "0xa284b8de2b7e1b37068e8b53695f89c2a1d1025b0a912fdbfd0a371fb38b1b54",
+              "blockNumber": 445,
+              "gasUsed": 248388
+            },
+            {
+              "tipo": "Compra",
+              "ofertaId": 59,
+              "transactionHash": "0xd73cede09c7e7c172c5167b05c71647565c6d716cde03d833b59eb361bd3976e",
+              "blockNumber": 447,
+              "gasUsed": 277526
+            },
+            {
+              "tipo": "Emitido",
+              "ofertaId": null,
+              "transactionHash": "0xab1b831d832b0db1378ffc671d98d1dd51f553ae9dd185fd74fb9d3c47f66a32",
+              "blockNumber": 451,
+              "gasUsed": 248388
+            },
+            {
+              "tipo": "Compra",
+              "ofertaId": 60,
+              "transactionHash": "0xf0b147a08916ebc7689184207ca89cd1f4462aa75026ccfb203b2efbfbccf4b2",
+              "blockNumber": 453,
+              "gasUsed": 277526
+            },
+            {
+              "tipo": "Emitido",
+              "ofertaId": null,
+              "transactionHash": "0x3441642d98c840f05191ce7cbaefc8365577d2c56fff019ae8337e028a16bc2f",
+              "blockNumber": 457,
+              "gasUsed": 248388
+            },
+            {
+              "tipo": "Compra",
+              "ofertaId": 61,
+              "transactionHash": "0x8264f0952eeec4c72dd6477ebcdac5211d42168ccbff4bda20300fdc3b4f39a6",
+              "blockNumber": 459,
+              "gasUsed": 277526
+            },
+            {
+              "tipo": "Emitido",
+              "ofertaId": null,
+              "transactionHash": "0x9a8616c4da2e6f5e3f9c0fc4b574b8f286d01a8bbd2b3d1cbb3cd1695acc6a9e",
+              "blockNumber": 462,
+              "gasUsed": 248388
+            },
+            {
+              "tipo": "Compra",
+              "ofertaId": 62,
+              "transactionHash": "0x65235ce6a13a36ad1490b26e33e324d8de34901c618bbc519951e84dc126abb8",
+              "blockNumber": 464,
+              "gasUsed": 277526
+            }
+          ]
+        },
+        "ofertas": [
+          53,
+          54,
+          55,
+          56,
+          57,
+          58,
+          59,
+          60,
+          61,
+          62
+        ],
+        "publicacionesFallidas": [],
+        "confirmadasReportadasPorMsCompra": {
+          "53": 1,
+          "54": 1,
+          "55": 1,
+          "56": 1,
+          "57": 1,
+          "58": 1,
+          "59": 1,
+          "60": 1,
+          "61": 1,
+          "62": 1
+        },
+        "fronteraOnChain": "Compra/Emitido on-chain (MarketEscrow/EnergyToken); disparo off-chain via ms_venta/ms_compra",
+        "evidencia": [
+          {
+            "runId": "RUN-E3",
+            "tipo": "Emitido",
+            "contrato": "EnergyToken",
+            "args": {
+              "id": 3000000,
+              "a": "0xB0Bd826A46B21cc05d9b9574215E510dA6ABcB54",
+              "kwh": 100,
+              "precio": 10,
+              "lecturaId": "0x9b5bd8cc6fe55648b8536852abf41bb3f808095878444f2f51cd7124b019cec9"
+            },
+            "transactionHash": "0x76a7252433da10151c14ab90d2b51a5444f496ddb9ac6011952ca55960a89608",
+            "blockNumber": 410,
+            "logIndex": 1,
+            "gasUsed": 248388
+          },
+          {
+            "runId": "RUN-E3",
+            "tipo": "Compra",
+            "contrato": "MarketEscrow",
+            "args": {
+              "ofertaId": 53,
+              "vendedor": "0xB0Bd826A46B21cc05d9b9574215E510dA6ABcB54",
+              "comprador": "0xE9a5e7f52be7aA931249350BD89EB87752CbcCfE",
+              "id": 3000000,
+              "kwh": 100,
+              "total": 1000
+            },
+            "transactionHash": "0x9704c283b3ecaac71f4813738510d975328c305caf582b68fba1ecc6eabdeb83",
+            "blockNumber": 412,
+            "logIndex": 1,
+            "gasUsed": 277526
+          },
+          {
+            "runId": "RUN-E3",
+            "tipo": "Emitido",
+            "contrato": "EnergyToken",
+            "args": {
+              "id": 3000001,
+              "a": "0x230B05858046cFB6CFAEe2f9908e8b996D8a8aaA",
+              "kwh": 100,
+              "precio": 10,
+              "lecturaId": "0x63b5c3f77edf8c7a4323967995415c235f0af65dfb5558e485ff66cc4d735033"
+            },
+            "transactionHash": "0x9703b340df99ebe4637b6e31ddc1dd1c0f1c4a507b3876ac347131c38eb6e847",
+            "blockNumber": 416,
+            "logIndex": 1,
+            "gasUsed": 248388
+          },
+          {
+            "runId": "RUN-E3",
+            "tipo": "Compra",
+            "contrato": "MarketEscrow",
+            "args": {
+              "ofertaId": 54,
+              "vendedor": "0x230B05858046cFB6CFAEe2f9908e8b996D8a8aaA",
+              "comprador": "0x5e532edF9Fbc9bCE03a28B038576A744E4Ba3765",
+              "id": 3000001,
+              "kwh": 100,
+              "total": 1000
+            },
+            "transactionHash": "0x3ca34c3f06a9723850cc515ae282efb729ce5922907b8edb903d051b09692daa",
+            "blockNumber": 418,
+            "logIndex": 1,
+            "gasUsed": 277526
+          },
+          {
+            "runId": "RUN-E3",
+            "tipo": "Emitido",
+            "contrato": "EnergyToken",
+            "args": {
+              "id": 3000002,
+              "a": "0xBfcE822Bfb7CDd13C98D332203824D05B35Ba63a",
+              "kwh": 100,
+              "precio": 10,
+              "lecturaId": "0xa393adb7f7cb821e27f8ddd0534b964be2d829242809f710963e912c69766c55"
+            },
+            "transactionHash": "0x70faa85c050dad76894c7236cebb66dbea3e0c79d70ed26d7656d8bb1a6293d1",
+            "blockNumber": 421,
+            "logIndex": 1,
+            "gasUsed": 248388
+          },
+          {
+            "runId": "RUN-E3",
+            "tipo": "Compra",
+            "contrato": "MarketEscrow",
+            "args": {
+              "ofertaId": 55,
+              "vendedor": "0xBfcE822Bfb7CDd13C98D332203824D05B35Ba63a",
+              "comprador": "0x356F98E64f692b6b12d0159389317AE529910Ae8",
+              "id": 3000002,
+              "kwh": 100,
+              "total": 1000
+            },
+            "transactionHash": "0x4319b5174ba7276b5fe78498bffba621d58af854b7a5e09691bb3607d3a1ecef",
+            "blockNumber": 423,
+            "logIndex": 1,
+            "gasUsed": 277526
+          },
+          {
+            "runId": "RUN-E3",
+            "tipo": "Emitido",
+            "contrato": "EnergyToken",
+            "args": {
+              "id": 3000003,
+              "a": "0x09f5c90B8f6b4866DA7ed9752a064083e500C931",
+              "kwh": 100,
+              "precio": 10,
+              "lecturaId": "0x944dc1f9d95f7bba317625909da60cdd1d4e2bfa793d7627c650bddcfd1df553"
+            },
+            "transactionHash": "0xd58d4d354f0ab084d1c20ebcd30d1db29b5a2b78df00d0fb4baad9370ebf9ab9",
+            "blockNumber": 426,
+            "logIndex": 1,
+            "gasUsed": 248376
+          },
+          {
+            "runId": "RUN-E3",
+            "tipo": "Compra",
+            "contrato": "MarketEscrow",
+            "args": {
+              "ofertaId": 56,
+              "vendedor": "0x09f5c90B8f6b4866DA7ed9752a064083e500C931",
+              "comprador": "0x9C6f56D226689aC947B96473637370AF3ef61319",
+              "id": 3000003,
+              "kwh": 100,
+              "total": 1000
+            },
+            "transactionHash": "0xddebc626a8eb54dcc10d024e1130c363d2e2f4248775d73f30f18839590632ad",
+            "blockNumber": 428,
+            "logIndex": 1,
+            "gasUsed": 277526
+          },
+          {
+            "runId": "RUN-E3",
+            "tipo": "Emitido",
+            "contrato": "EnergyToken",
+            "args": {
+              "id": 3000004,
+              "a": "0x476aC910B7f260862CD4032e76ab75A166CbD2D4",
+              "kwh": 100,
+              "precio": 10,
+              "lecturaId": "0x5cb95968192c7c0d0930d6cf82538f331a525aff343f6d69ec14be862f493d17"
+            },
+            "transactionHash": "0xfecf623e1f4550b5531115a974a92d432e70713d57b9bfeddd625dd858f7dcaf",
+            "blockNumber": 433,
+            "logIndex": 1,
+            "gasUsed": 248388
+          },
+          {
+            "runId": "RUN-E3",
+            "tipo": "Compra",
+            "contrato": "MarketEscrow",
+            "args": {
+              "ofertaId": 57,
+              "vendedor": "0x476aC910B7f260862CD4032e76ab75A166CbD2D4",
+              "comprador": "0x46cd9Dc395136F7F5B338B78161cEb42c0730DD2",
+              "id": 3000004,
+              "kwh": 100,
+              "total": 1000
+            },
+            "transactionHash": "0xa8e251199fbae99e55e1862c96e5e1d22aae41febb647e4cd81cbe26f72203c5",
+            "blockNumber": 435,
+            "logIndex": 1,
+            "gasUsed": 277526
+          },
+          {
+            "runId": "RUN-E3",
+            "tipo": "Emitido",
+            "contrato": "EnergyToken",
+            "args": {
+              "id": 3000005,
+              "a": "0x5acE0139DE5C3ED5706C62455aAf54E2272A2057",
+              "kwh": 100,
+              "precio": 10,
+              "lecturaId": "0x9492f9c4ed89c9e27cea7704098d24e17c5c49b0d4a6030fccfb728da89a81d0"
+            },
+            "transactionHash": "0x404c14b82440b00583075f10824cd82e32115b20a1efd487f9490df9404e7c84",
+            "blockNumber": 440,
+            "logIndex": 1,
+            "gasUsed": 248388
+          },
+          {
+            "runId": "RUN-E3",
+            "tipo": "Compra",
+            "contrato": "MarketEscrow",
+            "args": {
+              "ofertaId": 58,
+              "vendedor": "0x5acE0139DE5C3ED5706C62455aAf54E2272A2057",
+              "comprador": "0x2b833226aCD9f56997B1320F7f88f1bCa01F287c",
+              "id": 3000005,
+              "kwh": 100,
+              "total": 1000
+            },
+            "transactionHash": "0xac31f0df6d050489f04277c2a7643184a2acd9ff87f9085dd04bfd9e77aa318f",
+            "blockNumber": 442,
+            "logIndex": 1,
+            "gasUsed": 277526
+          },
+          {
+            "runId": "RUN-E3",
+            "tipo": "Emitido",
+            "contrato": "EnergyToken",
+            "args": {
+              "id": 3000006,
+              "a": "0x099fBd2c98D462Fc5f17802128EFcf9D4cF97166",
+              "kwh": 100,
+              "precio": 10,
+              "lecturaId": "0x3de8b1e582e58c0b751697060af09782f6e5d3c7ccf86a09aea34571b47b2336"
+            },
+            "transactionHash": "0xa284b8de2b7e1b37068e8b53695f89c2a1d1025b0a912fdbfd0a371fb38b1b54",
+            "blockNumber": 445,
+            "logIndex": 1,
+            "gasUsed": 248388
+          },
+          {
+            "runId": "RUN-E3",
+            "tipo": "Compra",
+            "contrato": "MarketEscrow",
+            "args": {
+              "ofertaId": 59,
+              "vendedor": "0x099fBd2c98D462Fc5f17802128EFcf9D4cF97166",
+              "comprador": "0xfB467c4f18b4a9F3CA68b2b34627A43e5154066A",
+              "id": 3000006,
+              "kwh": 100,
+              "total": 1000
+            },
+            "transactionHash": "0xd73cede09c7e7c172c5167b05c71647565c6d716cde03d833b59eb361bd3976e",
+            "blockNumber": 447,
+            "logIndex": 1,
+            "gasUsed": 277526
+          },
+          {
+            "runId": "RUN-E3",
+            "tipo": "Emitido",
+            "contrato": "EnergyToken",
+            "args": {
+              "id": 3000007,
+              "a": "0xDC5E84efbf341619C20866bD81B907255CAF5C48",
+              "kwh": 100,
+              "precio": 10,
+              "lecturaId": "0xb377d4a71aade036811c44714488ceb65ae2dc8dc27bef9b116b3583e48846d0"
+            },
+            "transactionHash": "0xab1b831d832b0db1378ffc671d98d1dd51f553ae9dd185fd74fb9d3c47f66a32",
+            "blockNumber": 451,
+            "logIndex": 1,
+            "gasUsed": 248388
+          },
+          {
+            "runId": "RUN-E3",
+            "tipo": "Compra",
+            "contrato": "MarketEscrow",
+            "args": {
+              "ofertaId": 60,
+              "vendedor": "0xDC5E84efbf341619C20866bD81B907255CAF5C48",
+              "comprador": "0x48b079ddA3AefD6989A84A1B65e6C8bDe37C83f9",
+              "id": 3000007,
+              "kwh": 100,
+              "total": 1000
+            },
+            "transactionHash": "0xf0b147a08916ebc7689184207ca89cd1f4462aa75026ccfb203b2efbfbccf4b2",
+            "blockNumber": 453,
+            "logIndex": 1,
+            "gasUsed": 277526
+          },
+          {
+            "runId": "RUN-E3",
+            "tipo": "Emitido",
+            "contrato": "EnergyToken",
+            "args": {
+              "id": 3000008,
+              "a": "0x72d153745eE0b3b13b8e72210DaE67B032ABef5a",
+              "kwh": 100,
+              "precio": 10,
+              "lecturaId": "0x29ae4f8f1a2e4aed2acfcbefdbdf697b65e6619fc2123d11e807899bd19d87d9"
+            },
+            "transactionHash": "0x3441642d98c840f05191ce7cbaefc8365577d2c56fff019ae8337e028a16bc2f",
+            "blockNumber": 457,
+            "logIndex": 1,
+            "gasUsed": 248388
+          },
+          {
+            "runId": "RUN-E3",
+            "tipo": "Compra",
+            "contrato": "MarketEscrow",
+            "args": {
+              "ofertaId": 61,
+              "vendedor": "0x72d153745eE0b3b13b8e72210DaE67B032ABef5a",
+              "comprador": "0xB3D7DBFB04C0bf1E62e71aD41854EDc63b0F99eA",
+              "id": 3000008,
+              "kwh": 100,
+              "total": 1000
+            },
+            "transactionHash": "0x8264f0952eeec4c72dd6477ebcdac5211d42168ccbff4bda20300fdc3b4f39a6",
+            "blockNumber": 459,
+            "logIndex": 1,
+            "gasUsed": 277526
+          },
+          {
+            "runId": "RUN-E3",
+            "tipo": "Emitido",
+            "contrato": "EnergyToken",
+            "args": {
+              "id": 3000009,
+              "a": "0x2642D0FdCa59eCe473109E7F972EE7Bcd78D9AD0",
+              "kwh": 100,
+              "precio": 10,
+              "lecturaId": "0xfb89c9403835e8427f03573b4f09918ec318296fdfa73ca7eeb32b363fb21504"
+            },
+            "transactionHash": "0x9a8616c4da2e6f5e3f9c0fc4b574b8f286d01a8bbd2b3d1cbb3cd1695acc6a9e",
+            "blockNumber": 462,
+            "logIndex": 1,
+            "gasUsed": 248388
+          },
+          {
+            "runId": "RUN-E3",
+            "tipo": "Compra",
+            "contrato": "MarketEscrow",
+            "args": {
+              "ofertaId": 62,
+              "vendedor": "0x2642D0FdCa59eCe473109E7F972EE7Bcd78D9AD0",
+              "comprador": "0x875282dcba7a2eb61De572172E74534ACEC6BBAC",
+              "id": 3000009,
+              "kwh": 100,
+              "total": 1000
+            },
+            "transactionHash": "0x65235ce6a13a36ad1490b26e33e324d8de34901c618bbc519951e84dc126abb8",
+            "blockNumber": 464,
+            "logIndex": 1,
+            "gasUsed": 277526
+          }
+        ]
+      },
+      "error": null,
+      "verdict": "PASS",
+      "metricas": {},
+      "eventos": [
+        {
+          "runId": "RUN-E3",
+          "tipo": "Emitido",
+          "contrato": "EnergyToken",
+          "args": {
+            "id": 3000000,
+            "a": "0xB0Bd826A46B21cc05d9b9574215E510dA6ABcB54",
+            "kwh": 100,
+            "precio": 10,
+            "lecturaId": "0x9b5bd8cc6fe55648b8536852abf41bb3f808095878444f2f51cd7124b019cec9"
+          },
+          "transactionHash": "0x76a7252433da10151c14ab90d2b51a5444f496ddb9ac6011952ca55960a89608",
+          "blockNumber": 410,
+          "logIndex": 1,
+          "gasUsed": 248388
+        },
+        {
+          "runId": "RUN-E3",
+          "tipo": "Compra",
+          "contrato": "MarketEscrow",
+          "args": {
+            "ofertaId": 53,
+            "vendedor": "0xB0Bd826A46B21cc05d9b9574215E510dA6ABcB54",
+            "comprador": "0xE9a5e7f52be7aA931249350BD89EB87752CbcCfE",
+            "id": 3000000,
+            "kwh": 100,
+            "total": 1000
+          },
+          "transactionHash": "0x9704c283b3ecaac71f4813738510d975328c305caf582b68fba1ecc6eabdeb83",
+          "blockNumber": 412,
+          "logIndex": 1,
+          "gasUsed": 277526
+        },
+        {
+          "runId": "RUN-E3",
+          "tipo": "Emitido",
+          "contrato": "EnergyToken",
+          "args": {
+            "id": 3000001,
+            "a": "0x230B05858046cFB6CFAEe2f9908e8b996D8a8aaA",
+            "kwh": 100,
+            "precio": 10,
+            "lecturaId": "0x63b5c3f77edf8c7a4323967995415c235f0af65dfb5558e485ff66cc4d735033"
+          },
+          "transactionHash": "0x9703b340df99ebe4637b6e31ddc1dd1c0f1c4a507b3876ac347131c38eb6e847",
+          "blockNumber": 416,
+          "logIndex": 1,
+          "gasUsed": 248388
+        },
+        {
+          "runId": "RUN-E3",
+          "tipo": "Compra",
+          "contrato": "MarketEscrow",
+          "args": {
+            "ofertaId": 54,
+            "vendedor": "0x230B05858046cFB6CFAEe2f9908e8b996D8a8aaA",
+            "comprador": "0x5e532edF9Fbc9bCE03a28B038576A744E4Ba3765",
+            "id": 3000001,
+            "kwh": 100,
+            "total": 1000
+          },
+          "transactionHash": "0x3ca34c3f06a9723850cc515ae282efb729ce5922907b8edb903d051b09692daa",
+          "blockNumber": 418,
+          "logIndex": 1,
+          "gasUsed": 277526
+        },
+        {
+          "runId": "RUN-E3",
+          "tipo": "Emitido",
+          "contrato": "EnergyToken",
+          "args": {
+            "id": 3000002,
+            "a": "0xBfcE822Bfb7CDd13C98D332203824D05B35Ba63a",
+            "kwh": 100,
+            "precio": 10,
+            "lecturaId": "0xa393adb7f7cb821e27f8ddd0534b964be2d829242809f710963e912c69766c55"
+          },
+          "transactionHash": "0x70faa85c050dad76894c7236cebb66dbea3e0c79d70ed26d7656d8bb1a6293d1",
+          "blockNumber": 421,
+          "logIndex": 1,
+          "gasUsed": 248388
+        },
+        {
+          "runId": "RUN-E3",
+          "tipo": "Compra",
+          "contrato": "MarketEscrow",
+          "args": {
+            "ofertaId": 55,
+            "vendedor": "0xBfcE822Bfb7CDd13C98D332203824D05B35Ba63a",
+            "comprador": "0x356F98E64f692b6b12d0159389317AE529910Ae8",
+            "id": 3000002,
+            "kwh": 100,
+            "total": 1000
+          },
+          "transactionHash": "0x4319b5174ba7276b5fe78498bffba621d58af854b7a5e09691bb3607d3a1ecef",
+          "blockNumber": 423,
+          "logIndex": 1,
+          "gasUsed": 277526
+        },
+        {
+          "runId": "RUN-E3",
+          "tipo": "Emitido",
+          "contrato": "EnergyToken",
+          "args": {
+            "id": 3000003,
+            "a": "0x09f5c90B8f6b4866DA7ed9752a064083e500C931",
+            "kwh": 100,
+            "precio": 10,
+            "lecturaId": "0x944dc1f9d95f7bba317625909da60cdd1d4e2bfa793d7627c650bddcfd1df553"
+          },
+          "transactionHash": "0xd58d4d354f0ab084d1c20ebcd30d1db29b5a2b78df00d0fb4baad9370ebf9ab9",
+          "blockNumber": 426,
+          "logIndex": 1,
+          "gasUsed": 248376
+        },
+        {
+          "runId": "RUN-E3",
+          "tipo": "Compra",
+          "contrato": "MarketEscrow",
+          "args": {
+            "ofertaId": 56,
+            "vendedor": "0x09f5c90B8f6b4866DA7ed9752a064083e500C931",
+            "comprador": "0x9C6f56D226689aC947B96473637370AF3ef61319",
+            "id": 3000003,
+            "kwh": 100,
+            "total": 1000
+          },
+          "transactionHash": "0xddebc626a8eb54dcc10d024e1130c363d2e2f4248775d73f30f18839590632ad",
+          "blockNumber": 428,
+          "logIndex": 1,
+          "gasUsed": 277526
+        },
+        {
+          "runId": "RUN-E3",
+          "tipo": "Emitido",
+          "contrato": "EnergyToken",
+          "args": {
+            "id": 3000004,
+            "a": "0x476aC910B7f260862CD4032e76ab75A166CbD2D4",
+            "kwh": 100,
+            "precio": 10,
+            "lecturaId": "0x5cb95968192c7c0d0930d6cf82538f331a525aff343f6d69ec14be862f493d17"
+          },
+          "transactionHash": "0xfecf623e1f4550b5531115a974a92d432e70713d57b9bfeddd625dd858f7dcaf",
+          "blockNumber": 433,
+          "logIndex": 1,
+          "gasUsed": 248388
+        },
+        {
+          "runId": "RUN-E3",
+          "tipo": "Compra",
+          "contrato": "MarketEscrow",
+          "args": {
+            "ofertaId": 57,
+            "vendedor": "0x476aC910B7f260862CD4032e76ab75A166CbD2D4",
+            "comprador": "0x46cd9Dc395136F7F5B338B78161cEb42c0730DD2",
+            "id": 3000004,
+            "kwh": 100,
+            "total": 1000
+          },
+          "transactionHash": "0xa8e251199fbae99e55e1862c96e5e1d22aae41febb647e4cd81cbe26f72203c5",
+          "blockNumber": 435,
+          "logIndex": 1,
+          "gasUsed": 277526
+        },
+        {
+          "runId": "RUN-E3",
+          "tipo": "Emitido",
+          "contrato": "EnergyToken",
+          "args": {
+            "id": 3000005,
+            "a": "0x5acE0139DE5C3ED5706C62455aAf54E2272A2057",
+            "kwh": 100,
+            "precio": 10,
+            "lecturaId": "0x9492f9c4ed89c9e27cea7704098d24e17c5c49b0d4a6030fccfb728da89a81d0"
+          },
+          "transactionHash": "0x404c14b82440b00583075f10824cd82e32115b20a1efd487f9490df9404e7c84",
+          "blockNumber": 440,
+          "logIndex": 1,
+          "gasUsed": 248388
+        },
+        {
+          "runId": "RUN-E3",
+          "tipo": "Compra",
+          "contrato": "MarketEscrow",
+          "args": {
+            "ofertaId": 58,
+            "vendedor": "0x5acE0139DE5C3ED5706C62455aAf54E2272A2057",
+            "comprador": "0x2b833226aCD9f56997B1320F7f88f1bCa01F287c",
+            "id": 3000005,
+            "kwh": 100,
+            "total": 1000
+          },
+          "transactionHash": "0xac31f0df6d050489f04277c2a7643184a2acd9ff87f9085dd04bfd9e77aa318f",
+          "blockNumber": 442,
+          "logIndex": 1,
+          "gasUsed": 277526
+        },
+        {
+          "runId": "RUN-E3",
+          "tipo": "Emitido",
+          "contrato": "EnergyToken",
+          "args": {
+            "id": 3000006,
+            "a": "0x099fBd2c98D462Fc5f17802128EFcf9D4cF97166",
+            "kwh": 100,
+            "precio": 10,
+            "lecturaId": "0x3de8b1e582e58c0b751697060af09782f6e5d3c7ccf86a09aea34571b47b2336"
+          },
+          "transactionHash": "0xa284b8de2b7e1b37068e8b53695f89c2a1d1025b0a912fdbfd0a371fb38b1b54",
+          "blockNumber": 445,
+          "logIndex": 1,
+          "gasUsed": 248388
+        },
+        {
+          "runId": "RUN-E3",
+          "tipo": "Compra",
+          "contrato": "MarketEscrow",
+          "args": {
+            "ofertaId": 59,
+            "vendedor": "0x099fBd2c98D462Fc5f17802128EFcf9D4cF97166",
+            "comprador": "0xfB467c4f18b4a9F3CA68b2b34627A43e5154066A",
+            "id": 3000006,
+            "kwh": 100,
+            "total": 1000
+          },
+          "transactionHash": "0xd73cede09c7e7c172c5167b05c71647565c6d716cde03d833b59eb361bd3976e",
+          "blockNumber": 447,
+          "logIndex": 1,
+          "gasUsed": 277526
+        },
+        {
+          "runId": "RUN-E3",
+          "tipo": "Emitido",
+          "contrato": "EnergyToken",
+          "args": {
+            "id": 3000007,
+            "a": "0xDC5E84efbf341619C20866bD81B907255CAF5C48",
+            "kwh": 100,
+            "precio": 10,
+            "lecturaId": "0xb377d4a71aade036811c44714488ceb65ae2dc8dc27bef9b116b3583e48846d0"
+          },
+          "transactionHash": "0xab1b831d832b0db1378ffc671d98d1dd51f553ae9dd185fd74fb9d3c47f66a32",
+          "blockNumber": 451,
+          "logIndex": 1,
+          "gasUsed": 248388
+        },
+        {
+          "runId": "RUN-E3",
+          "tipo": "Compra",
+          "contrato": "MarketEscrow",
+          "args": {
+            "ofertaId": 60,
+            "vendedor": "0xDC5E84efbf341619C20866bD81B907255CAF5C48",
+            "comprador": "0x48b079ddA3AefD6989A84A1B65e6C8bDe37C83f9",
+            "id": 3000007,
+            "kwh": 100,
+            "total": 1000
+          },
+          "transactionHash": "0xf0b147a08916ebc7689184207ca89cd1f4462aa75026ccfb203b2efbfbccf4b2",
+          "blockNumber": 453,
+          "logIndex": 1,
+          "gasUsed": 277526
+        },
+        {
+          "runId": "RUN-E3",
+          "tipo": "Emitido",
+          "contrato": "EnergyToken",
+          "args": {
+            "id": 3000008,
+            "a": "0x72d153745eE0b3b13b8e72210DaE67B032ABef5a",
+            "kwh": 100,
+            "precio": 10,
+            "lecturaId": "0x29ae4f8f1a2e4aed2acfcbefdbdf697b65e6619fc2123d11e807899bd19d87d9"
+          },
+          "transactionHash": "0x3441642d98c840f05191ce7cbaefc8365577d2c56fff019ae8337e028a16bc2f",
+          "blockNumber": 457,
+          "logIndex": 1,
+          "gasUsed": 248388
+        },
+        {
+          "runId": "RUN-E3",
+          "tipo": "Compra",
+          "contrato": "MarketEscrow",
+          "args": {
+            "ofertaId": 61,
+            "vendedor": "0x72d153745eE0b3b13b8e72210DaE67B032ABef5a",
+            "comprador": "0xB3D7DBFB04C0bf1E62e71aD41854EDc63b0F99eA",
+            "id": 3000008,
+            "kwh": 100,
+            "total": 1000
+          },
+          "transactionHash": "0x8264f0952eeec4c72dd6477ebcdac5211d42168ccbff4bda20300fdc3b4f39a6",
+          "blockNumber": 459,
+          "logIndex": 1,
+          "gasUsed": 277526
+        },
+        {
+          "runId": "RUN-E3",
+          "tipo": "Emitido",
+          "contrato": "EnergyToken",
+          "args": {
+            "id": 3000009,
+            "a": "0x2642D0FdCa59eCe473109E7F972EE7Bcd78D9AD0",
+            "kwh": 100,
+            "precio": 10,
+            "lecturaId": "0xfb89c9403835e8427f03573b4f09918ec318296fdfa73ca7eeb32b363fb21504"
+          },
+          "transactionHash": "0x9a8616c4da2e6f5e3f9c0fc4b574b8f286d01a8bbd2b3d1cbb3cd1695acc6a9e",
+          "blockNumber": 462,
+          "logIndex": 1,
+          "gasUsed": 248388
+        },
+        {
+          "runId": "RUN-E3",
+          "tipo": "Compra",
+          "contrato": "MarketEscrow",
+          "args": {
+            "ofertaId": 62,
+            "vendedor": "0x2642D0FdCa59eCe473109E7F972EE7Bcd78D9AD0",
+            "comprador": "0x875282dcba7a2eb61De572172E74534ACEC6BBAC",
+            "id": 3000009,
+            "kwh": 100,
+            "total": 1000
+          },
+          "transactionHash": "0x65235ce6a13a36ad1490b26e33e324d8de34901c618bbc519951e84dc126abb8",
+          "blockNumber": 464,
+          "logIndex": 1,
+          "gasUsed": 277526
+        }
+      ]
+    }
+  ],
+  "evidenciaOnChain": [
+    {
+      "experimento": "E3",
+      "tipo": "Emitido",
+      "contrato": "EnergyToken",
+      "transactionHash": "0x76a7252433da10151c14ab90d2b51a5444f496ddb9ac6011952ca55960a89608",
+      "blockNumber": 410,
+      "gasUsed": 248388,
+      "logIndex": 1,
+      "args": {
+        "id": 3000000,
+        "a": "0xB0Bd826A46B21cc05d9b9574215E510dA6ABcB54",
+        "kwh": 100,
+        "precio": 10,
+        "lecturaId": "0x9b5bd8cc6fe55648b8536852abf41bb3f808095878444f2f51cd7124b019cec9"
+      }
+    },
+    {
+      "experimento": "E3",
+      "tipo": "Compra",
+      "contrato": "MarketEscrow",
+      "transactionHash": "0x9704c283b3ecaac71f4813738510d975328c305caf582b68fba1ecc6eabdeb83",
+      "blockNumber": 412,
+      "gasUsed": 277526,
+      "logIndex": 1,
+      "args": {
+        "ofertaId": 53,
+        "vendedor": "0xB0Bd826A46B21cc05d9b9574215E510dA6ABcB54",
+        "comprador": "0xE9a5e7f52be7aA931249350BD89EB87752CbcCfE",
+        "id": 3000000,
+        "kwh": 100,
+        "total": 1000
+      }
+    },
+    {
+      "experimento": "E3",
+      "tipo": "Emitido",
+      "contrato": "EnergyToken",
+      "transactionHash": "0x9703b340df99ebe4637b6e31ddc1dd1c0f1c4a507b3876ac347131c38eb6e847",
+      "blockNumber": 416,
+      "gasUsed": 248388,
+      "logIndex": 1,
+      "args": {
+        "id": 3000001,
+        "a": "0x230B05858046cFB6CFAEe2f9908e8b996D8a8aaA",
+        "kwh": 100,
+        "precio": 10,
+        "lecturaId": "0x63b5c3f77edf8c7a4323967995415c235f0af65dfb5558e485ff66cc4d735033"
+      }
+    },
+    {
+      "experimento": "E3",
+      "tipo": "Compra",
+      "contrato": "MarketEscrow",
+      "transactionHash": "0x3ca34c3f06a9723850cc515ae282efb729ce5922907b8edb903d051b09692daa",
+      "blockNumber": 418,
+      "gasUsed": 277526,
+      "logIndex": 1,
+      "args": {
+        "ofertaId": 54,
+        "vendedor": "0x230B05858046cFB6CFAEe2f9908e8b996D8a8aaA",
+        "comprador": "0x5e532edF9Fbc9bCE03a28B038576A744E4Ba3765",
+        "id": 3000001,
+        "kwh": 100,
+        "total": 1000
+      }
+    },
+    {
+      "experimento": "E3",
+      "tipo": "Emitido",
+      "contrato": "EnergyToken",
+      "transactionHash": "0x70faa85c050dad76894c7236cebb66dbea3e0c79d70ed26d7656d8bb1a6293d1",
+      "blockNumber": 421,
+      "gasUsed": 248388,
+      "logIndex": 1,
+      "args": {
+        "id": 3000002,
+        "a": "0xBfcE822Bfb7CDd13C98D332203824D05B35Ba63a",
+        "kwh": 100,
+        "precio": 10,
+        "lecturaId": "0xa393adb7f7cb821e27f8ddd0534b964be2d829242809f710963e912c69766c55"
+      }
+    },
+    {
+      "experimento": "E3",
+      "tipo": "Compra",
+      "contrato": "MarketEscrow",
+      "transactionHash": "0x4319b5174ba7276b5fe78498bffba621d58af854b7a5e09691bb3607d3a1ecef",
+      "blockNumber": 423,
+      "gasUsed": 277526,
+      "logIndex": 1,
+      "args": {
+        "ofertaId": 55,
+        "vendedor": "0xBfcE822Bfb7CDd13C98D332203824D05B35Ba63a",
+        "comprador": "0x356F98E64f692b6b12d0159389317AE529910Ae8",
+        "id": 3000002,
+        "kwh": 100,
+        "total": 1000
+      }
+    },
+    {
+      "experimento": "E3",
+      "tipo": "Emitido",
+      "contrato": "EnergyToken",
+      "transactionHash": "0xd58d4d354f0ab084d1c20ebcd30d1db29b5a2b78df00d0fb4baad9370ebf9ab9",
+      "blockNumber": 426,
+      "gasUsed": 248376,
+      "logIndex": 1,
+      "args": {
+        "id": 3000003,
+        "a": "0x09f5c90B8f6b4866DA7ed9752a064083e500C931",
+        "kwh": 100,
+        "precio": 10,
+        "lecturaId": "0x944dc1f9d95f7bba317625909da60cdd1d4e2bfa793d7627c650bddcfd1df553"
+      }
+    },
+    {
+      "experimento": "E3",
+      "tipo": "Compra",
+      "contrato": "MarketEscrow",
+      "transactionHash": "0xddebc626a8eb54dcc10d024e1130c363d2e2f4248775d73f30f18839590632ad",
+      "blockNumber": 428,
+      "gasUsed": 277526,
+      "logIndex": 1,
+      "args": {
+        "ofertaId": 56,
+        "vendedor": "0x09f5c90B8f6b4866DA7ed9752a064083e500C931",
+        "comprador": "0x9C6f56D226689aC947B96473637370AF3ef61319",
+        "id": 3000003,
+        "kwh": 100,
+        "total": 1000
+      }
+    },
+    {
+      "experimento": "E3",
+      "tipo": "Emitido",
+      "contrato": "EnergyToken",
+      "transactionHash": "0xfecf623e1f4550b5531115a974a92d432e70713d57b9bfeddd625dd858f7dcaf",
+      "blockNumber": 433,
+      "gasUsed": 248388,
+      "logIndex": 1,
+      "args": {
+        "id": 3000004,
+        "a": "0x476aC910B7f260862CD4032e76ab75A166CbD2D4",
+        "kwh": 100,
+        "precio": 10,
+        "lecturaId": "0x5cb95968192c7c0d0930d6cf82538f331a525aff343f6d69ec14be862f493d17"
+      }
+    },
+    {
+      "experimento": "E3",
+      "tipo": "Compra",
+      "contrato": "MarketEscrow",
+      "transactionHash": "0xa8e251199fbae99e55e1862c96e5e1d22aae41febb647e4cd81cbe26f72203c5",
+      "blockNumber": 435,
+      "gasUsed": 277526,
+      "logIndex": 1,
+      "args": {
+        "ofertaId": 57,
+        "vendedor": "0x476aC910B7f260862CD4032e76ab75A166CbD2D4",
+        "comprador": "0x46cd9Dc395136F7F5B338B78161cEb42c0730DD2",
+        "id": 3000004,
+        "kwh": 100,
+        "total": 1000
+      }
+    },
+    {
+      "experimento": "E3",
+      "tipo": "Emitido",
+      "contrato": "EnergyToken",
+      "transactionHash": "0x404c14b82440b00583075f10824cd82e32115b20a1efd487f9490df9404e7c84",
+      "blockNumber": 440,
+      "gasUsed": 248388,
+      "logIndex": 1,
+      "args": {
+        "id": 3000005,
+        "a": "0x5acE0139DE5C3ED5706C62455aAf54E2272A2057",
+        "kwh": 100,
+        "precio": 10,
+        "lecturaId": "0x9492f9c4ed89c9e27cea7704098d24e17c5c49b0d4a6030fccfb728da89a81d0"
+      }
+    },
+    {
+      "experimento": "E3",
+      "tipo": "Compra",
+      "contrato": "MarketEscrow",
+      "transactionHash": "0xac31f0df6d050489f04277c2a7643184a2acd9ff87f9085dd04bfd9e77aa318f",
+      "blockNumber": 442,
+      "gasUsed": 277526,
+      "logIndex": 1,
+      "args": {
+        "ofertaId": 58,
+        "vendedor": "0x5acE0139DE5C3ED5706C62455aAf54E2272A2057",
+        "comprador": "0x2b833226aCD9f56997B1320F7f88f1bCa01F287c",
+        "id": 3000005,
+        "kwh": 100,
+        "total": 1000
+      }
+    },
+    {
+      "experimento": "E3",
+      "tipo": "Emitido",
+      "contrato": "EnergyToken",
+      "transactionHash": "0xa284b8de2b7e1b37068e8b53695f89c2a1d1025b0a912fdbfd0a371fb38b1b54",
+      "blockNumber": 445,
+      "gasUsed": 248388,
+      "logIndex": 1,
+      "args": {
+        "id": 3000006,
+        "a": "0x099fBd2c98D462Fc5f17802128EFcf9D4cF97166",
+        "kwh": 100,
+        "precio": 10,
+        "lecturaId": "0x3de8b1e582e58c0b751697060af09782f6e5d3c7ccf86a09aea34571b47b2336"
+      }
+    },
+    {
+      "experimento": "E3",
+      "tipo": "Compra",
+      "contrato": "MarketEscrow",
+      "transactionHash": "0xd73cede09c7e7c172c5167b05c71647565c6d716cde03d833b59eb361bd3976e",
+      "blockNumber": 447,
+      "gasUsed": 277526,
+      "logIndex": 1,
+      "args": {
+        "ofertaId": 59,
+        "vendedor": "0x099fBd2c98D462Fc5f17802128EFcf9D4cF97166",
+        "comprador": "0xfB467c4f18b4a9F3CA68b2b34627A43e5154066A",
+        "id": 3000006,
+        "kwh": 100,
+        "total": 1000
+      }
+    },
+    {
+      "experimento": "E3",
+      "tipo": "Emitido",
+      "contrato": "EnergyToken",
+      "transactionHash": "0xab1b831d832b0db1378ffc671d98d1dd51f553ae9dd185fd74fb9d3c47f66a32",
+      "blockNumber": 451,
+      "gasUsed": 248388,
+      "logIndex": 1,
+      "args": {
+        "id": 3000007,
+        "a": "0xDC5E84efbf341619C20866bD81B907255CAF5C48",
+        "kwh": 100,
+        "precio": 10,
+        "lecturaId": "0xb377d4a71aade036811c44714488ceb65ae2dc8dc27bef9b116b3583e48846d0"
+      }
+    },
+    {
+      "experimento": "E3",
+      "tipo": "Compra",
+      "contrato": "MarketEscrow",
+      "transactionHash": "0xf0b147a08916ebc7689184207ca89cd1f4462aa75026ccfb203b2efbfbccf4b2",
+      "blockNumber": 453,
+      "gasUsed": 277526,
+      "logIndex": 1,
+      "args": {
+        "ofertaId": 60,
+        "vendedor": "0xDC5E84efbf341619C20866bD81B907255CAF5C48",
+        "comprador": "0x48b079ddA3AefD6989A84A1B65e6C8bDe37C83f9",
+        "id": 3000007,
+        "kwh": 100,
+        "total": 1000
+      }
+    },
+    {
+      "experimento": "E3",
+      "tipo": "Emitido",
+      "contrato": "EnergyToken",
+      "transactionHash": "0x3441642d98c840f05191ce7cbaefc8365577d2c56fff019ae8337e028a16bc2f",
+      "blockNumber": 457,
+      "gasUsed": 248388,
+      "logIndex": 1,
+      "args": {
+        "id": 3000008,
+        "a": "0x72d153745eE0b3b13b8e72210DaE67B032ABef5a",
+        "kwh": 100,
+        "precio": 10,
+        "lecturaId": "0x29ae4f8f1a2e4aed2acfcbefdbdf697b65e6619fc2123d11e807899bd19d87d9"
+      }
+    },
+    {
+      "experimento": "E3",
+      "tipo": "Compra",
+      "contrato": "MarketEscrow",
+      "transactionHash": "0x8264f0952eeec4c72dd6477ebcdac5211d42168ccbff4bda20300fdc3b4f39a6",
+      "blockNumber": 459,
+      "gasUsed": 277526,
+      "logIndex": 1,
+      "args": {
+        "ofertaId": 61,
+        "vendedor": "0x72d153745eE0b3b13b8e72210DaE67B032ABef5a",
+        "comprador": "0xB3D7DBFB04C0bf1E62e71aD41854EDc63b0F99eA",
+        "id": 3000008,
+        "kwh": 100,
+        "total": 1000
+      }
+    },
+    {
+      "experimento": "E3",
+      "tipo": "Emitido",
+      "contrato": "EnergyToken",
+      "transactionHash": "0x9a8616c4da2e6f5e3f9c0fc4b574b8f286d01a8bbd2b3d1cbb3cd1695acc6a9e",
+      "blockNumber": 462,
+      "gasUsed": 248388,
+      "logIndex": 1,
+      "args": {
+        "id": 3000009,
+        "a": "0x2642D0FdCa59eCe473109E7F972EE7Bcd78D9AD0",
+        "kwh": 100,
+        "precio": 10,
+        "lecturaId": "0xfb89c9403835e8427f03573b4f09918ec318296fdfa73ca7eeb32b363fb21504"
+      }
+    },
+    {
+      "experimento": "E3",
+      "tipo": "Compra",
+      "contrato": "MarketEscrow",
+      "transactionHash": "0x65235ce6a13a36ad1490b26e33e324d8de34901c618bbc519951e84dc126abb8",
+      "blockNumber": 464,
+      "gasUsed": 277526,
+      "logIndex": 1,
+      "args": {
+        "ofertaId": 62,
+        "vendedor": "0x2642D0FdCa59eCe473109E7F972EE7Bcd78D9AD0",
+        "comprador": "0x875282dcba7a2eb61De572172E74534ACEC6BBAC",
+        "id": 3000009,
+        "kwh": 100,
+        "total": 1000
+      }
+    }
+  ],
+  "metricasIncumplidas": {}
+}

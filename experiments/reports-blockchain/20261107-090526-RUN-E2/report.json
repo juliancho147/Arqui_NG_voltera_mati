@@ -1,0 +1,850 @@
+{
+  "runId": "RUN-E2",
+  "verdict": "PASS",
+  "header": {
+    "runId": "RUN-E2",
+    "inicio": "2026-11-07T09:04:41-0500",
+    "fin": "2026-11-07T09:05:26-0500",
+    "cantidades": {
+      "E2": {
+        "totalAlterados": 50,
+        "conteoPorForma": {
+          "byte": 13,
+          "metadatos": 16,
+          "reemplazo": 21
+        }
+      }
+    },
+    "repeticiones": {
+      "E2": 1
+    },
+    "contratos": {
+      "EnergyToken": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+      "MarketEscrow": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+    },
+    "herramientas": {
+      "foundry": "forge 1.9.0"
+    },
+    "params": {
+      "seleccion": "e2",
+      "totalAlterados": 50,
+      "pinata": "real(subida)+local(verificacion)",
+      "chainId": 11155111,
+      "rpcUrl": "http://localhost:8545"
+    }
+  },
+  "fronteraOnOffChain": {
+    "onChain": "Emision de tokens (EnergyToken.emitir -> Emitido), atomicidad de la venta (MarketEscrow.comprar -> Compra) y anclaje del CID (MarketEscrow.anclar -> Anclado). Firmado por la plataforma (modelo custodial).",
+    "offChain": "Validacion del oraculo (ms_oraculo), generacion/verificacion del certificado por contenido (ms_certificado, con Pinata real + fallback local) y la orquestacion/medicion del runner. Las APIs de medidor y clima son stub."
+  },
+  "experiments": [
+    {
+      "experiment": "E2",
+      "title": "E2 — Integridad del certificado off-chain",
+      "hypothesis": "Toda alteracion de un certificado PDF (byte, metadatos o reemplazo) se detecta contra el CID anclado on-chain (deteccion 100%), un certificado integro se verifica como INTEGRO (0 falsos positivos) y la verificacion es rapida (p95 <= 3 s).",
+      "started": "2026-11-07T09:04:41-0500",
+      "finished": "2026-11-07T09:05:26-0500",
+      "params": {
+        "runId": "RUN-E2",
+        "totalAlterados": 50,
+        "conteoPorForma": {
+          "byte": 13,
+          "metadatos": 16,
+          "reemplazo": 21
+        },
+        "ofertaBase": 1,
+        "umbralP95Segundos": 3.0,
+        "metricas": {
+          "tasaDeteccion": 1.0,
+          "deteccionesPorForma": {
+            "byte": 13,
+            "metadatos": 16,
+            "reemplazo": 21
+          },
+          "falsosPositivos": 0,
+          "p95VerificacionSegundos": 0.006028
+        }
+      },
+      "criteria": [
+        {
+          "id": "R3.1",
+          "title": "Dataset de 50 alterados con >=1 por forma",
+          "status": "PASS",
+          "expected": "50 alterados; >=1 por forma ('byte', 'metadatos', 'reemplazo')",
+          "observed": "50 alterados; conteo {'byte': 13, 'metadatos': 16, 'reemplazo': 21}",
+          "evidence": {
+            "conteoPorForma": {
+              "byte": 13,
+              "metadatos": 16,
+              "reemplazo": 21
+            }
+          }
+        },
+        {
+          "id": "R3.6",
+          "title": "Tasa de deteccion de alteraciones = 100%",
+          "status": "PASS",
+          "expected": "100% (todos los alterados -> ALTERADO)",
+          "observed": "50/50 detectados (100.0%)",
+          "evidence": {
+            "detecciones": 50,
+            "total": 50,
+            "porForma": {
+              "byte": 13,
+              "metadatos": 16,
+              "reemplazo": 21
+            },
+            "casosNoDetectados": []
+          }
+        },
+        {
+          "id": "R3.8",
+          "title": "Falsos positivos = 0 (ningun integro marcado ALTERADO)",
+          "status": "PASS",
+          "expected": "0 falsos positivos",
+          "observed": "0 falsos positivos; 50/50 integros OK",
+          "evidence": {
+            "falsosPositivos": 0,
+            "integrosOk": 50
+          }
+        },
+        {
+          "id": "R3.10",
+          "title": "Latencia_p95 de verificacion <= 3 s",
+          "status": "PASS",
+          "expected": "p95 <= 3.0 s",
+          "observed": "p95 = 0.0060 s sobre 100 verificaciones",
+          "evidence": {
+            "p95Segundos": 0.006028,
+            "umbralSegundos": 3.0,
+            "muestras": 100
+          }
+        }
+      ],
+      "notes": [
+        "Veredicto E2: PASS | deteccion=100.0% falsosPositivos=0 p95=0.0060s"
+      ],
+      "data": {
+        "mediciones": [
+          {
+            "ofertaId": 1,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.006999
+          },
+          {
+            "ofertaId": 1,
+            "forma": "reemplazo",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.004679
+          },
+          {
+            "ofertaId": 2,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.003851
+          },
+          {
+            "ofertaId": 2,
+            "forma": "metadatos",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.003741
+          },
+          {
+            "ofertaId": 3,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.003451
+          },
+          {
+            "ofertaId": 3,
+            "forma": "metadatos",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.004477
+          },
+          {
+            "ofertaId": 4,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.003915
+          },
+          {
+            "ofertaId": 4,
+            "forma": "reemplazo",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.003495
+          },
+          {
+            "ofertaId": 5,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.006724
+          },
+          {
+            "ofertaId": 5,
+            "forma": "reemplazo",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.00443
+          },
+          {
+            "ofertaId": 6,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.003783
+          },
+          {
+            "ofertaId": 6,
+            "forma": "reemplazo",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.002937
+          },
+          {
+            "ofertaId": 7,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.002711
+          },
+          {
+            "ofertaId": 7,
+            "forma": "metadatos",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.003007
+          },
+          {
+            "ofertaId": 8,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.00462
+          },
+          {
+            "ofertaId": 8,
+            "forma": "metadatos",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.003331
+          },
+          {
+            "ofertaId": 9,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.00365
+          },
+          {
+            "ofertaId": 9,
+            "forma": "reemplazo",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.003196
+          },
+          {
+            "ofertaId": 10,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.004467
+          },
+          {
+            "ofertaId": 10,
+            "forma": "metadatos",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.003188
+          },
+          {
+            "ofertaId": 11,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.004575
+          },
+          {
+            "ofertaId": 11,
+            "forma": "byte",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.004575
+          },
+          {
+            "ofertaId": 12,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.00372
+          },
+          {
+            "ofertaId": 12,
+            "forma": "reemplazo",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.004255
+          },
+          {
+            "ofertaId": 13,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.004054
+          },
+          {
+            "ofertaId": 13,
+            "forma": "reemplazo",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.00355
+          },
+          {
+            "ofertaId": 14,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.004028
+          },
+          {
+            "ofertaId": 14,
+            "forma": "byte",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.007378
+          },
+          {
+            "ofertaId": 15,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.00363
+          },
+          {
+            "ofertaId": 15,
+            "forma": "byte",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.003848
+          },
+          {
+            "ofertaId": 16,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.004445
+          },
+          {
+            "ofertaId": 16,
+            "forma": "reemplazo",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.003205
+          },
+          {
+            "ofertaId": 17,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.004245
+          },
+          {
+            "ofertaId": 17,
+            "forma": "reemplazo",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.003907
+          },
+          {
+            "ofertaId": 18,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.004252
+          },
+          {
+            "ofertaId": 18,
+            "forma": "byte",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.004951
+          },
+          {
+            "ofertaId": 19,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.006028
+          },
+          {
+            "ofertaId": 19,
+            "forma": "byte",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.004713
+          },
+          {
+            "ofertaId": 20,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.004016
+          },
+          {
+            "ofertaId": 20,
+            "forma": "metadatos",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.003313
+          },
+          {
+            "ofertaId": 21,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.004442
+          },
+          {
+            "ofertaId": 21,
+            "forma": "metadatos",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.00536
+          },
+          {
+            "ofertaId": 22,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.003787
+          },
+          {
+            "ofertaId": 22,
+            "forma": "metadatos",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.003836
+          },
+          {
+            "ofertaId": 23,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.004248
+          },
+          {
+            "ofertaId": 23,
+            "forma": "reemplazo",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.003789
+          },
+          {
+            "ofertaId": 24,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.003878
+          },
+          {
+            "ofertaId": 24,
+            "forma": "reemplazo",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.00406
+          },
+          {
+            "ofertaId": 25,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.004236
+          },
+          {
+            "ofertaId": 25,
+            "forma": "metadatos",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.004228
+          },
+          {
+            "ofertaId": 26,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.003297
+          },
+          {
+            "ofertaId": 26,
+            "forma": "reemplazo",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.00367
+          },
+          {
+            "ofertaId": 27,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.004315
+          },
+          {
+            "ofertaId": 27,
+            "forma": "metadatos",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.004104
+          },
+          {
+            "ofertaId": 28,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.003857
+          },
+          {
+            "ofertaId": 28,
+            "forma": "byte",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.003923
+          },
+          {
+            "ofertaId": 29,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.003746
+          },
+          {
+            "ofertaId": 29,
+            "forma": "byte",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.003321
+          },
+          {
+            "ofertaId": 30,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.004037
+          },
+          {
+            "ofertaId": 30,
+            "forma": "byte",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.003137
+          },
+          {
+            "ofertaId": 31,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.005192
+          },
+          {
+            "ofertaId": 31,
+            "forma": "metadatos",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.003921
+          },
+          {
+            "ofertaId": 32,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.004328
+          },
+          {
+            "ofertaId": 32,
+            "forma": "byte",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.020916
+          },
+          {
+            "ofertaId": 33,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.003294
+          },
+          {
+            "ofertaId": 33,
+            "forma": "reemplazo",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.002682
+          },
+          {
+            "ofertaId": 34,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.005369
+          },
+          {
+            "ofertaId": 34,
+            "forma": "reemplazo",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.004341
+          },
+          {
+            "ofertaId": 35,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.004739
+          },
+          {
+            "ofertaId": 35,
+            "forma": "reemplazo",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.005198
+          },
+          {
+            "ofertaId": 36,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.004015
+          },
+          {
+            "ofertaId": 36,
+            "forma": "reemplazo",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.004089
+          },
+          {
+            "ofertaId": 37,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.003425
+          },
+          {
+            "ofertaId": 37,
+            "forma": "reemplazo",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.003176
+          },
+          {
+            "ofertaId": 38,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.00456
+          },
+          {
+            "ofertaId": 38,
+            "forma": "metadatos",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.004786
+          },
+          {
+            "ofertaId": 39,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.004415
+          },
+          {
+            "ofertaId": 39,
+            "forma": "byte",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.0041
+          },
+          {
+            "ofertaId": 40,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.00425
+          },
+          {
+            "ofertaId": 40,
+            "forma": "byte",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.004282
+          },
+          {
+            "ofertaId": 41,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.003063
+          },
+          {
+            "ofertaId": 41,
+            "forma": "metadatos",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.003187
+          },
+          {
+            "ofertaId": 42,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.004426
+          },
+          {
+            "ofertaId": 42,
+            "forma": "reemplazo",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.003508
+          },
+          {
+            "ofertaId": 43,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.006952
+          },
+          {
+            "ofertaId": 43,
+            "forma": "reemplazo",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.005717
+          },
+          {
+            "ofertaId": 44,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.005032
+          },
+          {
+            "ofertaId": 44,
+            "forma": "metadatos",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.005398
+          },
+          {
+            "ofertaId": 45,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.00476
+          },
+          {
+            "ofertaId": 45,
+            "forma": "metadatos",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.003724
+          },
+          {
+            "ofertaId": 46,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.003964
+          },
+          {
+            "ofertaId": 46,
+            "forma": "byte",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.003562
+          },
+          {
+            "ofertaId": 47,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.004059
+          },
+          {
+            "ofertaId": 47,
+            "forma": "metadatos",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.003947
+          },
+          {
+            "ofertaId": 48,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.004222
+          },
+          {
+            "ofertaId": 48,
+            "forma": "reemplazo",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.004513
+          },
+          {
+            "ofertaId": 49,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.004367
+          },
+          {
+            "ofertaId": 49,
+            "forma": "reemplazo",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.004282
+          },
+          {
+            "ofertaId": 50,
+            "forma": null,
+            "veredicto": "INTEGRO",
+            "latenciaS": 0.002722
+          },
+          {
+            "ofertaId": 50,
+            "forma": "byte",
+            "veredicto": "ALTERADO",
+            "latenciaS": 0.00258
+          }
+        ],
+        "latenciasVerificacionS": [
+          0.006999,
+          0.004679,
+          0.003851,
+          0.003741,
+          0.003451,
+          0.004477,
+          0.003915,
+          0.003495,
+          0.006724,
+          0.00443,
+          0.003783,
+          0.002937,
+          0.002711,
+          0.003007,
+          0.00462,
+          0.003331,
+          0.00365,
+          0.003196,
+          0.004467,
+          0.003188,
+          0.004575,
+          0.004575,
+          0.00372,
+          0.004255,
+          0.004054,
+          0.00355,
+          0.004028,
+          0.007378,
+          0.00363,
+          0.003848,
+          0.004445,
+          0.003205,
+          0.004245,
+          0.003907,
+          0.004252,
+          0.004951,
+          0.006028,
+          0.004713,
+          0.004016,
+          0.003313,
+          0.004442,
+          0.00536,
+          0.003787,
+          0.003836,
+          0.004248,
+          0.003789,
+          0.003878,
+          0.00406,
+          0.004236,
+          0.004228,
+          0.003297,
+          0.00367,
+          0.004315,
+          0.004104,
+          0.003857,
+          0.003923,
+          0.003746,
+          0.003321,
+          0.004037,
+          0.003137,
+          0.005192,
+          0.003921,
+          0.004328,
+          0.020916,
+          0.003294,
+          0.002682,
+          0.005369,
+          0.004341,
+          0.004739,
+          0.005198,
+          0.004015,
+          0.004089,
+          0.003425,
+          0.003176,
+          0.00456,
+          0.004786,
+          0.004415,
+          0.0041,
+          0.00425,
+          0.004282,
+          0.003063,
+          0.003187,
+          0.004426,
+          0.003508,
+          0.006952,
+          0.005717,
+          0.005032,
+          0.005398,
+          0.00476,
+          0.003724,
+          0.003964,
+          0.003562,
+          0.004059,
+          0.003947,
+          0.004222,
+          0.004513,
+          0.004367,
+          0.004282,
+          0.002722,
+          0.00258
+        ]
+      },
+      "error": null,
+      "verdict": "PASS",
+      "metricas": {
+        "tasaDeteccion": 1.0,
+        "deteccionesPorForma": {
+          "byte": 13,
+          "metadatos": 16,
+          "reemplazo": 21
+        },
+        "falsosPositivos": 0,
+        "p95VerificacionSegundos": 0.006028
+      },
+      "eventos": []
+    }
+  ],
+  "evidenciaOnChain": [],
+  "metricasIncumplidas": {}
+}

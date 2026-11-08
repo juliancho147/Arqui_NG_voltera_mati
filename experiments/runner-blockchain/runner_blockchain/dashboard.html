@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Voltera · Experimentos Blockchain — Dashboard</title>
+<style>
+  :root{
+    --bg:#0b1020; --panel:#141b2e; --panel2:#1b2440; --txt:#e6ecff; --dim:#8aa0c8;
+    --cyan:#35d0e0; --green:#38d39f; --red:#ff5d73; --yellow:#ffcc4d; --mag:#b48cff; --line:#26324f;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:15px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--txt)}
+  header{padding:18px 24px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#121a30,#0b1020)}
+  header h1{margin:0;font-size:19px;letter-spacing:.4px}
+  header .sub{color:var(--dim);font-size:13px;margin-top:2px}
+  header .grupo{color:var(--mag);font-size:13px;margin-top:4px}
+  .wrap{max-width:1100px;margin:0 auto;padding:20px 24px;display:grid;gap:18px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:860px){.row{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .card h2{margin:0 0 12px;font-size:14px;text-transform:uppercase;letter-spacing:1px;color:var(--cyan)}
+  .estado{display:flex;gap:18px;flex-wrap:wrap}
+  .pill{display:inline-flex;align-items:center;gap:7px;background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13px}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--dim)}
+  .dot.on{background:var(--green);box-shadow:0 0 8px var(--green)}
+  .dot.off{background:var(--red)}
+  .dot.warn{background:var(--yellow)}
+  .btns{display:flex;gap:10px;flex-wrap:wrap}
+  button{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:9px;padding:10px 16px;font-size:14px;cursor:pointer;transition:.15s}
+  button:hover{border-color:var(--cyan);color:var(--cyan)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button.go{background:#17233f;border-color:#2b3a63}
+  .params{display:flex;gap:14px;align-items:center;color:var(--dim);font-size:13px;margin-top:10px;flex-wrap:wrap}
+  .params input{width:64px;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:5px 8px}
+  #feed{background:#070b16;border:1px solid var(--line);border-radius:10px;padding:12px;height:300px;overflow:auto;font:12.5px/1.55 ui-monospace,Menlo,Consolas,monospace}
+  .ev{display:flex;gap:9px;padding:2px 0;border-bottom:1px dashed #141c30}
+  .ev .fase{min-width:92px;color:var(--cyan)}
+  .ev .fase.servicios{color:var(--mag)} .ev .fase.inyeccion{color:var(--yellow)}
+  .ev .fase.eventos{color:var(--cyan)} .ev .fase.veredicto{color:var(--green)}
+  .ev .fase.error{color:var(--red)} .ev .fase.entorno{color:#7fd0ff}
+  .ev .t{color:#4b5f86;min-width:70px}
+  .veredicto{font-size:26px;font-weight:700;letter-spacing:1px}
+  .veredicto.PASS{color:var(--green)} .veredicto.FAIL{color:var(--red)}
+  table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
+  th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--dim);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.5px}
+  .badge{font-weight:700;padding:2px 9px;border-radius:6px;font-size:12px}
+  .badge.PASS{background:rgba(56,211,159,.16);color:var(--green)}
+  .badge.FAIL{background:rgba(255,93,115,.16);color:var(--red)}
+  .metrics{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 2px}
+  .metric{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 11px;font-size:12.5px}
+  .metric b{color:var(--cyan)}
+  .muted{color:var(--dim)}
+  .evid{font:12px/1.5 ui-monospace,Menlo,monospace;color:var(--dim);margin-top:6px}
+  .hidden{display:none}
+  .spin{display:inline-block;width:13px;height:13px;border:2px solid #2b3a63;border-top-color:var(--cyan);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<header>
+  <h1>⚡ Voltera · Validación experimental Blockchain <span class="muted">— Modo Maestría</span></h1>
+  <div class="sub">Universidad de los Andes · cadena local Anvil · evidencia on-chain reproducible</div>
+  <div class="grupo">Grupo: Julian Builes · Mario Montero · Carlos Garavito · Juan Puentes</div>
+</header>
+
+<div class="wrap">
+  <div class="card">
+    <h2>Estado del entorno</h2>
+    <div class="estado" id="estado">
+      <span class="pill"><span class="dot" id="d-anvil"></span> Anvil <span class="muted" id="t-anvil">—</span></span>
+      <span class="pill"><span class="dot" id="d-contr"></span> Contratos <span class="muted" id="t-contr">—</span></span>
+      <span class="pill"><span class="dot" id="d-pin"></span> Pinata <span class="muted" id="t-pin">—</span></span>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="card">
+      <h2>Ejecutar experimento</h2>
+      <div class="btns">
+        <button class="go" data-exp="e1">E1 · Oracle</button>
+        <button class="go" data-exp="e2">E2 · Certificado</button>
+        <button class="go" data-exp="e3">E3 · Doble venta</button>
+        <button class="go" data-exp="all">Todos</button>
+      </div>
+      <div class="params">
+        <label>E2 alterados <input id="p-total" type="number" value="10" min="3"></label>
+        <label>E3 ofertas <input id="p-offers" type="number" value="10" min="1"></label>
+        <label>E3 compras <input id="p-buys" type="number" value="10" min="2"></label>
+      </div>
+      <div id="run-state" class="params"></div>
+    </div>
+
+    <div class="card">
+      <h2>Progreso en vivo</h2>
+      <div id="feed"><div class="muted">Lanza un experimento para ver el progreso…</div></div>
+    </div>
+  </div>
+
+  <div class="card hidden" id="result-card">
+    <h2>Resultado</h2>
+    <div id="result"></div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+let evtSrc = null, runId = null;
+
+function setDot(id, state, txt){
+  const d = $(id); d.className = "dot " + state;
+}
+async function refrescarEstado(){
+  try{
+    const e = await (await fetch("/estado")).json();
+    setDot("#d-anvil", e.anvil?"on":"off"); $("#t-anvil").textContent = e.anvil?("bloque "+e.bloque):"detenida";
+    setDot("#d-contr", e.contratos?"on":"warn"); $("#t-contr").textContent = e.contratos?"desplegados":"no desplegados";
+    setDot("#d-pin", e.pinata?"on":"warn"); $("#t-pin").textContent = e.pinata?"credencial":"fallback local";
+  }catch(err){ setDot("#d-anvil","off"); $("#t-anvil").textContent="sin servidor"; }
+}
+refrescarEstado(); setInterval(refrescarEstado, 4000);
+
+function hora(ts){ const d = new Date((ts||Date.now()/1000)*1000); return d.toLocaleTimeString("es-CO",{hour12:false}); }
+function addEv(ev){
+  const feed = $("#feed");
+  if(feed.querySelector(".muted")) feed.innerHTML = "";
+  const row = document.createElement("div"); row.className="ev";
+  const fase = ev.fase||"info";
+  row.innerHTML = `<span class="t">${hora(ev.ts)}</span><span class="fase ${fase}">${fase}</span><span>${(ev.msg||"")}</span>`;
+  feed.appendChild(row); feed.scrollTop = feed.scrollHeight;
+}
+
+function botones(dis){ document.querySelectorAll("button.go").forEach(b=>b.disabled=dis); }
+
+async function lanzar(exp){
+  if(evtSrc){ evtSrc.close(); }
+  $("#feed").innerHTML = ""; $("#result-card").classList.add("hidden");
+  botones(true);
+  $("#run-state").innerHTML = `<span class="spin"></span> ejecutando <b>${exp.toUpperCase()}</b>…`;
+  const body = {total:+$("#p-total").value, offers:+$("#p-offers").value, buys:+$("#p-buys").value};
+  const r = await (await fetch("/run/"+exp, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)})).json();
+  if(r.error){ $("#run-state").textContent = "error: "+r.error; botones(false); return; }
+  runId = r.runId;
+  evtSrc = new EventSource("/stream/"+runId);
+  evtSrc.onmessage = (m)=>{
+    let ev; try{ ev = JSON.parse(m.data); }catch(_){ return; }
+    if(ev.fase === "fin"){
+      evtSrc.close(); botones(false);
+      $("#run-state").innerHTML = `corrida finalizada`;
+      cargarReporte();
+      return;
+    }
+    addEv(ev);
+  };
+  evtSrc.onerror = ()=>{ /* reintento automatico del navegador */ };
+}
+document.querySelectorAll("button.go").forEach(b=> b.onclick = ()=>lanzar(b.dataset.exp));
+
+async function cargarReporte(){
+  // pequeno retraso para que el report.json termine de escribirse
+  for(let i=0;i<10;i++){
+    const resp = await fetch("/reporte/"+runId);
+    if(resp.ok){ render(await resp.json()); return; }
+    await new Promise(r=>setTimeout(r,500));
+  }
+}
+
+function render(d){
+  const card = $("#result-card"); card.classList.remove("hidden");
+  let html = `<div class="veredicto ${d.verdict}">${d.verdict}</div>`;
+  html += `<div class="muted">corrida ${d.runId} · ${(d.header&&d.header.inicio)||""}</div>`;
+  (d.experiments||[]).forEach(e=>{
+    html += `<h3 style="margin:16px 0 4px">${e.experiment} — ${e.title} <span class="badge ${e.verdict}">${e.verdict}</span></h3>`;
+    const m = e.metricas||{};
+    if(Object.keys(m).length){
+      html += `<div class="metrics">` + Object.entries(m).map(([k,v])=>`<span class="metric"><b>${k}</b> ${typeof v==="object"?JSON.stringify(v):v}</span>`).join("") + `</div>`;
+    }
+    html += `<table><thead><tr><th>Id</th><th>Estado</th><th>Criterio</th><th>Esperado</th><th>Observado</th></tr></thead><tbody>`;
+    (e.criteria||[]).forEach(c=>{
+      html += `<tr><td>${c.id}</td><td><span class="badge ${c.status}">${c.status}</span></td><td>${c.title}</td><td class="muted">${c.expected||""}</td><td class="${c.status==='FAIL'?'':''}">${c.observed||""}</td></tr>`;
+    });
+    html += `</tbody></table>`;
+  });
+  const ev = d.evidenciaOnChain||[];
+  if(ev.length){
+    const tipos = {}; let gas=0;
+    ev.forEach(x=>{ tipos[x.tipo]=(tipos[x.tipo]||0)+1; gas+=parseInt(x.gasUsed||0)||0; });
+    html += `<h3 style="margin:16px 0 4px">Evidencia on-chain</h3>`;
+    html += `<div class="muted">${ev.length} eventos (${Object.entries(tipos).map(([k,v])=>k+"="+v).join(", ")}) · gas total ${gas}</div>`;
+    html += `<div class="evid">` + ev.slice(0,5).map(x=>`${x.tipo.padEnd(8)} tx ${(x.transactionHash||"").slice(0,20)}… blk ${x.blockNumber} gas ${x.gasUsed}`).join("<br>") + (ev.length>5?`<br>… y ${ev.length-5} más`:"") + `</div>`;
+  }
+  card.querySelector("#result").innerHTML = html;
+  card.scrollIntoView({behavior:"smooth"});
+}
+</script>
+</body>
+</html>

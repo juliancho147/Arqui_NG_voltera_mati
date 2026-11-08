@@ -1,0 +1,56 @@
+{
+  "runId": "RUN-E3-CONTROL",
+  "verdict": "PASS",
+  "header": {
+    "runId": "RUN-E3-CONTROL",
+    "inicio": "2026-11-07T08:58:35-0500",
+    "fin": "2026-11-07T08:58:35-0500",
+    "cantidades": {
+      "E3-CONTROL": {}
+    },
+    "repeticiones": {
+      "E3-CONTROL": 1
+    },
+    "contratos": {},
+    "herramientas": {},
+    "params": {}
+  },
+  "fronteraOnOffChain": {
+    "onChain": "Emision de tokens (EnergyToken.emitir -> Emitido), atomicidad de la venta (MarketEscrow.comprar -> Compra) y anclaje del CID (MarketEscrow.anclar -> Anclado). Firmado por la plataforma (modelo custodial).",
+    "offChain": "Validacion del oraculo (ms_oraculo), generacion/verificacion del certificado por contenido (ms_certificado, con Pinata real + fallback local) y la orquestacion/medicion del runner. Las APIs de medidor y clima son stub."
+  },
+  "experiments": [
+    {
+      "experiment": "E3-CONTROL",
+      "title": "E3 control — mercado SIN escrow (demuestra doble venta)",
+      "hypothesis": "Sin la guarda de atomicidad del escrow, N compras concurrentes producen N ventas.",
+      "started": "2026-11-07T08:58:35-0500",
+      "finished": "2026-11-07T08:58:35-0500",
+      "params": {},
+      "criteria": [
+        {
+          "id": "CTRL-1",
+          "title": "Mercado sin escrow produce doble venta bajo concurrencia",
+          "status": "PASS",
+          "expected": ">1 venta (defecto esperado sin la guarda del contrato)",
+          "observed": "10 ventas de la misma oferta con 10 compras concurrentes",
+          "evidence": {}
+        }
+      ],
+      "notes": [
+        "Control off-chain: NO se despliega un contrato vulnerable; aisla la guarda de atomicidad."
+      ],
+      "data": {
+        "compras": 10,
+        "ventasSinEscrow": 10,
+        "contraste": "el MarketEscrow real limita esto a exactamente 1 (ver E3)"
+      },
+      "error": null,
+      "verdict": "PASS",
+      "metricas": {},
+      "eventos": []
+    }
+  ],
+  "evidenciaOnChain": [],
+  "metricasIncumplidas": {}
+}

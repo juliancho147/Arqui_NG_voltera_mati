@@ -12,17 +12,18 @@ endobj
 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
 endobj
 5 0 obj
-<< /Length 175 >>
+<< /Length 215 >>
 stream
 BT
 /F1 12 Tf
 72 720 Td
 14 TL
 (Certificado de compra de energia - Voltera) Tj
-T* (Oferta: 8007) Tj
-T* (nonce: 504260314) Tj
-T* (ofertaOriginal: 8) Tj
-T* (reemplazo: True) Tj
+T* (Oferta: 8) Tj
+T* (comprador: 0x0000000000000000000000000000000000000008) Tj
+T* (kwh: 108) Tj
+T* (ofertaId: 8) Tj
+T* (precio: 10) Tj
 ET
 endstream
 endobj
@@ -37,5 +38,8 @@ xref
 trailer
 << /Size 6 /Root 1 0 R >>
 startxref
-537
+577
+
+% metadatos alterados
+<< /Producer (voltera-e2) /ModDate (D:00000000000008) /Alterado 889291 >>
 %%EOF

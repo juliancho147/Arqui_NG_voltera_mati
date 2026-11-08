@@ -370,6 +370,195 @@ run_all() {
 }
 
 # ---------------------------------------------------------------------------
+# Pruebas negativas de manipulacion on-chain
+# ---------------------------------------------------------------------------
+run_manip() {
+  paso "Pruebas negativas de manipulacion on-chain (deben revertir)"
+  asegurar_entorno || return 1
+  cargar_env
+  info "intentos: reanclar, emitir no autorizado, comprar oferta vendida..."
+  ( cd "$RUNNER_DIR" && "$VENV_PY" - <<'PY'
+from pathlib import Path
+from runner_blockchain.chain.deployment import load_deployment
+from runner_blockchain.chain.chain_client import build_chain_client
+from runner_blockchain.experimentos import manipulaciones
+from runner_blockchain.reporte import reporte_desde_deployment, escribir_reporte
+dep=load_deployment(Path("../../deployment.json"))
+chain=build_chain_client(dep.rpc_url, contratos=dict(dep.contratos))
+res=manipulaciones.ejecutar(chain)
+rep=reporte_desde_deployment("RUN-MANIP",[res],dep,params={"seleccion":"manip"})
+out=escribir_reporte(rep, Path("../reports-blockchain"))
+print("Reporte_Resultados escrito en", out)
+PY
+) 2>&1 | grep -E "Reporte_Resultados|PASS|FAIL|Error|Traceback" || true
+  local dir; dir=$(ultimo_reporte_de "MANIP")
+  [ -n "$dir" ] && mostrar_reporte "$dir"
+}
+
+# ---------------------------------------------------------------------------
+# E3 control (mercado SIN escrow: demuestra doble venta)
+# ---------------------------------------------------------------------------
+run_e3_control() {
+  paso "E3 control — mercado SIN escrow (demuestra la doble venta)"
+  cargar_env
+  info "disparando 10 compras concurrentes sobre un mercado sin la guarda del escrow..."
+  ( cd "$RUNNER_DIR" && "$VENV_PY" - <<'PY'
+from pathlib import Path
+from runner_blockchain.experimentos import e3_control
+from runner_blockchain.reporte import construir_reporte, escribir_reporte
+res=e3_control.ejecutar_control("RUN-E3-CONTROL", compras=10)
+rep=construir_reporte("RUN-E3-CONTROL",[res])
+out=escribir_reporte(rep, Path("../reports-blockchain"))
+print("Reporte_Resultados escrito en", out)
+PY
+) 2>&1 | grep -E "Reporte_Resultados|PASS|FAIL|Error|Traceback" || true
+  local dir; dir=$(ultimo_reporte_de "E3-CONTROL")
+  [ -n "$dir" ] && mostrar_reporte "$dir"
+}
+
+# ---------------------------------------------------------------------------
+# Gas -> costo y decision de arquitectura
+# ---------------------------------------------------------------------------
+run_costos() {
+  paso "Gas -> costo y decision de arquitectura"
+  local gwei="${1:-20}" ethusd="${2:-3000}"
+  info "supuestos: gas=$gwei gwei, ETH=\$$ethusd ; usando gas real del ultimo reporte E3..."
+  ( cd "$RUNNER_DIR" && GWEI="$gwei" ETHUSD="$ethusd" "$VENV_PY" - <<'PY'
+import os, json, glob
+from runner_blockchain.experimentos import costos
+# Toma el gas por operacion del reporte E3 mas reciente, si existe.
+gas={"emitir":248388,"publicar":248000,"comprar":277526,"anclar":70000}
+reps=sorted(glob.glob("../reports-blockchain/*RUN-E3*/report.json"))
+if reps:
+    d=json.load(open(reps[-1]))
+    for e in d.get("experiments",[]):
+        for ev in d.get("evidenciaOnChain",[]):
+            pass
+sup=costos.SupuestosCosto(gas_price_gwei=float(os.environ["GWEI"]), eth_usd=float(os.environ["ETHUSD"]))
+r=costos.analizar(gas, sup)
+print("  costo por kWh tokenizado: $%.6f" % r["costoPorKwhUsd"])
+print("  costo por operacion:")
+for op,v in r["costoPorOperacion"].items():
+    print(f"    {op:10s} gas {v['gas']:>8}  ~ ${v['usd']:.6f}")
+print("  emision por lotes (ahorro):")
+for x in r["decisiones"]["emisionPorLotes"]:
+    print(f"    lote {x['lote']:>4}: ahorro {x['ahorroPct']}% (${x['ahorroUsd']})")
+print("  anclaje por cierre mensual (ahorro):")
+for x in r["decisiones"]["anclajePorCierreMensual"]:
+    print(f"    {x['comprasMes']:>5} compras/mes: ahorro {x['ahorroPct']}% (${x['ahorroUsd']})")
+print()
+print("  RECOMENDACION:")
+import textwrap
+print(textwrap.fill(r["recomendacion"], width=76, initial_indent="    ", subsequent_indent="    "))
+PY
+) 2>&1 || true
+}
+
+# ---------------------------------------------------------------------------
+# Latencia real en Sepolia (requiere credenciales en .env)
+# ---------------------------------------------------------------------------
+run_sepolia() {
+  paso "Latencia real en Sepolia (acuse <=2s / inclusion <=60s)"
+  cargar_env
+  if [ -z "${SEPOLIA_RPC_URL:-}" ] || [ -z "${PLATAFORMA_PRIVATE_KEY:-}" ]; then
+    err "faltan credenciales de Sepolia."
+    info "define en .env (fuera del repo): SEPOLIA_RPC_URL y PLATAFORMA_PRIVATE_KEY (cuenta con ETH de faucet)."
+    info "y un deployment-sepolia.json con las direcciones desplegadas en Sepolia."
+    warn "esta corrida gasta gas REAL de testnet; NO se ejecuta sin credenciales."
+    return 1
+  fi
+  local depfile="${SEPOLIA_DEPLOYMENT:-$ROOT/deployment-sepolia.json}"
+  [ -f "$depfile" ] || { err "no existe $depfile (despliega en Sepolia primero)"; return 1; }
+  info "corriendo 20 emisiones + 10 compras en Sepolia (esto puede tardar varios minutos)..."
+  ( cd "$RUNNER_DIR" && SEPOLIA_DEP="$depfile" "$VENV_PY" - <<'PY'
+import os
+from pathlib import Path
+from runner_blockchain.chain.deployment import load_deployment
+from runner_blockchain.chain.chain_client import build_chain_client
+from runner_blockchain.experimentos import latencia_sepolia
+from runner_blockchain.reporte import reporte_desde_deployment, escribir_reporte
+dep=load_deployment(Path(os.environ["SEPOLIA_DEP"]))
+chain=build_chain_client(os.environ.get("SEPOLIA_RPC_URL") or dep.rpc_url, contratos=dict(dep.contratos))
+res=latencia_sepolia.ejecutar(chain, emisiones=20, compras=10)
+rep=reporte_desde_deployment("RUN-SEPOLIA",[res],dep,params={"seleccion":"sepolia"})
+out=escribir_reporte(rep, Path("../reports-blockchain"))
+print("Reporte_Resultados escrito en", out)
+PY
+) 2>&1 | grep -E "Reporte_Resultados|PASS|FAIL|Error|Traceback" || true
+  local dir; dir=$(ultimo_reporte_de "SEPOLIA")
+  [ -n "$dir" ] && mostrar_reporte "$dir"
+}
+
+# ---------------------------------------------------------------------------
+# Dashboard web en vivo
+# ---------------------------------------------------------------------------
+dashboard() {
+  paso "Dashboard web en vivo (progreso + resultados)"
+  asegurar_entorno || return 1
+  cargar_env
+  local port="${1:-8800}"
+  info "sirviendo en http://127.0.0.1:$port  (Ctrl-C para detener)"
+  info "abre esa URL en el navegador; lanza E1/E2/E3 desde la pagina."
+  ( cd "$RUNNER_DIR" && VOLTERA_DASH_PORT="$port" "$VENV_PY" -m runner_blockchain.dashboard )
+}
+
+# ---------------------------------------------------------------------------
+# Logs de Anvil en vivo (abre una terminal nueva con tail -f)
+# ---------------------------------------------------------------------------
+ver_logs_anvil() {
+  paso "Logs de Anvil en vivo (nueva terminal)"
+  if [ ! -f "$ANVIL_LOG" ]; then
+    warn "no hay log de Anvil en $ANVIL_LOG"
+    if anvil_vivo; then
+      warn "Anvil parece haberse arrancado por fuera del script (sin log a archivo)."
+      info "para tener logs a archivo, detenlo y arrancalo con la opcion 1 (o './experimentos.sh up')."
+    else
+      info "arranca Anvil primero (opcion 1 o './experimentos.sh up')."
+    fi
+    return 1
+  fi
+
+  local uname_s; uname_s="$(uname -s)"
+
+  if [ "$uname_s" = "Darwin" ]; then
+    # macOS: generamos un .command ejecutable y lo abrimos con Terminal.app via `open`.
+    # Este metodo SIEMPRE abre una ventana nueva visible y al frente (mas fiable que
+    # `do script`, que puede reusar una pestana enterrada cuando se llama desde otra app
+    # como la terminal integrada de Kiro, TERM_PROGRAM=kiro).
+    local cmdfile="/tmp/voltera-anvil-logs.command"
+    cat > "$cmdfile" <<CMD
+#!/bin/bash
+printf '\033[36m== Logs de Anvil en vivo — Voltera ==\033[0m\n'
+printf 'archivo: %s\n' '$ANVIL_LOG'
+printf '\033[2m(cierra esta ventana para dejar de seguir los logs)\033[0m\n\n'
+exec tail -n 200 -f '$ANVIL_LOG'
+CMD
+    chmod +x "$cmdfile"
+    if open -a Terminal "$cmdfile" 2>/dev/null; then
+      # Traer Terminal.app al frente de forma explicita.
+      command -v osascript >/dev/null 2>&1 && \
+        osascript -e 'tell application "Terminal" to activate' >/dev/null 2>&1
+      ok "abri una ventana nueva de Terminal siguiendo $ANVIL_LOG"
+      info "si no la ves, revisa detras de esta ventana o en el Dock (icono Terminal)."
+    else
+      warn "no pude abrir Terminal.app automaticamente."
+      info "abre otra terminal y ejecuta:"
+      printf '    %s\n' "${C_BOLD}tail -f $ANVIL_LOG${C_RESET}"
+    fi
+  elif command -v gnome-terminal >/dev/null 2>&1; then
+    gnome-terminal -- bash -lc "tail -n 200 -f '$ANVIL_LOG'; exec bash" >/dev/null 2>&1 &
+    ok "abri una terminal nueva siguiendo $ANVIL_LOG"
+  elif command -v x-terminal-emulator >/dev/null 2>&1; then
+    x-terminal-emulator -e bash -lc "tail -n 200 -f '$ANVIL_LOG'; exec bash" >/dev/null 2>&1 &
+    ok "abri una terminal nueva siguiendo $ANVIL_LOG"
+  else
+    warn "no pude detectar un emulador de terminal para abrir una ventana nueva."
+    info "sigue los logs manualmente en otra terminal con:"
+    printf '    %s\n' "${C_BOLD}tail -f $ANVIL_LOG${C_RESET}"
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # Menu
 # ---------------------------------------------------------------------------
 menu() {
@@ -385,6 +574,12 @@ menu() {
     printf '%s\n' "  ${C_BOLD}6${C_RESET})  Correr TODOS (E1, E2, E3)"
     printf '%s\n' "  ${C_BOLD}7${C_RESET})  Ver ultimo reporte (elige experimento)"
     printf '%s\n' "  ${C_BOLD}8${C_RESET})  Detener Anvil y limpiar microservicios"
+    printf '%s\n' "  ${C_BOLD}9${C_RESET})  Dashboard web en vivo"
+    printf '%s\n' "  ${C_BOLD}10${C_RESET}) Ver logs de Anvil en vivo (nueva terminal)"
+    printf '%s\n' "  ${C_BOLD}11${C_RESET}) Pruebas negativas de manipulacion on-chain"
+    printf '%s\n' "  ${C_BOLD}12${C_RESET}) E3 control (mercado SIN escrow: doble venta)"
+    printf '%s\n' "  ${C_BOLD}13${C_RESET}) Gas -> costo y decision de arquitectura"
+    printf '%s\n' "  ${C_BOLD}14${C_RESET}) Latencia real en Sepolia (requiere .env)"
     printf '%s\n' "  ${C_BOLD}0${C_RESET})  Salir"
     linea
     printf '%s' "  selecciona una opcion: "
@@ -402,6 +597,12 @@ menu() {
          d=$(ultimo_reporte_de "$(echo "$x" | tr '[:lower:]' '[:upper:]')"); [ -z "$d" ] && d=$(ultimo_reporte_de "$(echo "$x" | tr '[:upper:]' '[:lower:]')")
          [ -n "$d" ] && mostrar_reporte "$d" || err "no hay reporte para $x"; pausa ;;
       8) parar_anvil; limpiar_servicios; pausa ;;
+      9) printf '  puerto [8800]: '; read -r pt; dashboard "${pt:-8800}" ;;
+      10) ver_logs_anvil; pausa ;;
+      11) run_manip; pausa ;;
+      12) run_e3_control; pausa ;;
+      13) printf '  gas (gwei) [20]: '; read -r g; printf '  ETH (USD) [3000]: '; read -r e; run_costos "${g:-20}" "${e:-3000}"; pausa ;;
+      14) run_sepolia; pausa ;;
       0) parar_anvil; limpiar_servicios; ok "hasta luego"; exit 0 ;;
       *) warn "opcion no reconocida" ; sleep 1 ;;
     esac
@@ -426,6 +627,12 @@ case "${1:-menu}" in
   e3)        run_e3 "${2:-10}" "${3:-10}" ;;
   all)       run_all "${2:-10}" "${3:-10}" "${4:-10}" ;;
   down|stop) parar_anvil; limpiar_servicios ;;
+  dashboard|dash) dashboard "${2:-8800}" ;;
+  logs|anvil-logs) ver_logs_anvil ;;
+  manip) run_manip ;;
+  e3-control|control) run_e3_control ;;
+  costos) run_costos "${2:-20}" "${3:-3000}" ;;
+  sepolia) run_sepolia ;;
   status)    banner; estado_breve ;;
-  *) echo "uso: $0 [menu|up|deploy|e1|e2 [N]|e3 [ofertas] [compras]|all|down|status]"; exit 1 ;;
+  *) echo "uso: $0 [menu|up|deploy|e1|e2 [N]|e3 [ofertas] [compras]|all|manip|e3-control|costos [gwei] [ethusd]|sepolia|dashboard [puerto]|logs|down|status]"; exit 1 ;;
 esac

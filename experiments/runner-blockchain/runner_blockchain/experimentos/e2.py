@@ -47,6 +47,7 @@ from typing import Any, Protocol
 from ..chain.chain_client import build_chain_client
 from ..chain.deployment import Deployment
 from ..reporte_modelo import FAIL, PASS, ExperimentResult, now_iso
+from .. import progreso
 
 logger = logging.getLogger(__name__)
 
@@ -338,8 +339,10 @@ def ejecutar(
     latencias: list[float] = []
     mediciones: list[MedicionVerificacion] = []
 
+    progreso.emitir("inyeccion", f"E2: anclando y verificando {len(casos)} certificados", exp="E2",
+                    total=len(casos))
     try:
-        for caso in casos:
+        for idx, caso in enumerate(casos, 1):
             # 2) Anclar el certificado integro on-chain.
             backend.anclar_integro(caso.oferta_id, caso.datos_compra)
 
@@ -360,6 +363,8 @@ def ejecutar(
             m_alt = _verificar_midiendo(backend, caso.oferta_id, forma=caso.forma)
             mediciones.append(m_alt)
             latencias.append(m_alt.latencia_s)
+            progreso.emitir("inyeccion", f"E2: caso {idx}/{len(casos)} ({caso.forma}) -> {m_alt.veredicto}",
+                            exp="E2", caso=idx, total=len(casos), forma=caso.forma, veredicto=m_alt.veredicto)
             if m_alt.veredicto == ALTERADO:
                 detecciones += 1
             elif m_alt.veredicto == INTEGRO:
@@ -449,6 +454,63 @@ def ejecutar(
 
 
 # ---------------------------------------------------------------------------
+# Siembra de una venta real on-chain (corrige CompraNoRealizada al anclar)
+# ---------------------------------------------------------------------------
+PRECIO_POR_KWH = 10       # precio fijado al emitir (debe ser > 0)
+KWH_CERTIFICADO = 50      # kWh de la oferta que respalda cada certificado
+
+
+class _SembradorVentaOnChain:
+    """Crea una venta real on-chain para que exista un certificado anclable (R3).
+
+    `MarketEscrow.anclar(ofertaId, cid)` exige estado Vendida; si no, revierte con
+    CompraNoRealizada. Por eso, antes de anclar, se hace la venta completa por caso:
+    emitir(vendedor, token, kwh, precio) -> publicar(...) -> comprar(ofertaId, comprador).
+    Devuelve el ofertaId REAL asignado por el contrato (no el indice del dataset).
+    """
+
+    def __init__(self, chain):
+        self._chain = chain
+
+    def _addr(self, etiqueta):
+        from web3 import Web3
+        h = hashlib.sha256(f"e2-{etiqueta}".encode()).hexdigest()
+        return Web3.to_checksum_address("0x" + h[-40:])
+
+    def sembrar_venta(self, caso_id, token_id, kwh):
+        from web3 import Web3
+        et = self._chain.energy_token
+        me = self._chain.market_escrow
+        plat = self._chain.plataforma
+        vendedor = self._addr(f"vendedor-{caso_id}")
+        comprador = self._addr(f"comprador-{caso_id}")
+
+        lectura = Web3.keccak(text=f"e2-seed-{token_id}-{caso_id}")
+        tx = et.functions.emitir(vendedor, int(token_id), int(kwh), PRECIO_POR_KWH, lectura
+                                 ).build_transaction({"from": plat, "nonce": self._chain.siguiente_nonce()})
+        r = self._chain.enviar_y_esperar(tx)
+        if not r.confirmada:
+            raise RuntimeError(f"E2 seed: emitir no confirmo (caso {caso_id}): {r.estado.value}")
+
+        tx = me.functions.publicar(vendedor, int(token_id), int(kwh)
+                                   ).build_transaction({"from": plat, "nonce": self._chain.siguiente_nonce()})
+        tx_hash = self._chain.enviar_tx(tx)
+        rec = self._chain.esperar_recibo(tx_hash)
+        if not rec.confirmada:
+            raise RuntimeError(f"E2 seed: publicar no confirmo (caso {caso_id}): {rec.estado.value}")
+        recibo = self._chain.w3.eth.get_transaction_receipt(tx_hash)
+        evts = me.events.OfertaPublicada().process_receipt(recibo)
+        oferta_id = int(evts[0]["args"]["ofertaId"])
+
+        tx = me.functions.comprar(oferta_id, comprador
+                                  ).build_transaction({"from": plat, "nonce": self._chain.siguiente_nonce()})
+        r = self._chain.enviar_y_esperar(tx)
+        if not r.confirmada:
+            raise RuntimeError(f"E2 seed: comprar no confirmo (oferta {oferta_id}): {r.estado.value}")
+        return oferta_id
+
+
+# ---------------------------------------------------------------------------
 # Backend en-proceso (logica de dominio real de ms_certificado)
 # ---------------------------------------------------------------------------
 class BackendEnProceso:
@@ -471,30 +533,39 @@ class BackendEnProceso:
 
         self._servicio = CertificadoService(config, chain, almacen=almacen)
         self._almacen = almacen
+        self._sembrador = _SembradorVentaOnChain(chain)
+        # Mapa caso_id (dataset) -> ofertaId REAL on-chain (para alterar/verificar).
+        self._ofertas: dict[int, int] = {}
 
     def anclar_integro(self, oferta_id: int, datos_compra: dict[str, Any]) -> bytes:
         from pdf import generar_pdf  # type: ignore[import-not-found]
+        from contenido import calcular_cid  # type: ignore[import-not-found]
 
-        self._servicio.emitir_certificado(oferta_id, datos_compra)
-        return generar_pdf(oferta_id, datos_compra)
+        # 1) Sembrar una venta real on-chain -> ofertaId real en estado Vendida.
+        token_id = 4_000_000 + int(oferta_id)
+        oferta_real = self._sembrador.sembrar_venta(oferta_id, token_id, KWH_CERTIFICADO)
+        self._ofertas[oferta_id] = oferta_real
+        # 2) Generar el PDF, guardarlo en el almacen local y anclar su CID contra el id real.
+        pdf_bytes = generar_pdf(oferta_id, datos_compra)
+        cid = self._almacen.guardar(pdf_bytes)
+        self._servicio._anclar(oferta_real, cid)  # noqa: SLF001 - anclaje directo con id real
+        return pdf_bytes
+
+    def _oferta_real(self, oferta_id: int) -> int:
+        return self._ofertas.get(oferta_id, oferta_id)
 
     def sustituir_contenido(self, oferta_id: int, pdf_alterado: bytes) -> None:
-        """Sobrescribe el blob guardado bajo el CID anclado con el PDF alterado.
-
-        Lee el CID anclado on-chain y escribe `pdf_alterado` en la ruta de ese CID, de modo
-        que la recuperacion por el CID anclado devuelva el contenido alterado. No cambia el
-        CID on-chain: eso es justo lo que E2 debe detectar como ALTERADO.
-        """
-        cid_anclado = self._servicio._leer_cid_anclado(oferta_id)  # noqa: SLF001 - uso interno intencional
+        """Sobrescribe el blob guardado bajo el CID anclado con el PDF alterado."""
+        oferta_real = self._oferta_real(oferta_id)
+        cid_anclado = self._servicio._leer_cid_anclado(oferta_real)  # noqa: SLF001
         if not cid_anclado:
-            raise RuntimeError(f"la oferta {oferta_id} no tiene CID anclado; no se puede alterar")
-        ruta = self._almacen._ruta(cid_anclado)  # noqa: SLF001 - escritura directa del blob por CID
+            raise RuntimeError(f"la oferta {oferta_real} no tiene CID anclado; no se puede alterar")
+        ruta = self._almacen._ruta(cid_anclado)  # noqa: SLF001
         ruta.write_bytes(bytes(pdf_alterado))
-        # Invalida la cache en memoria del almacen para que recupere el contenido alterado.
         self._almacen._blobs.pop(cid_anclado, None)  # noqa: SLF001
 
     def verificar(self, oferta_id: int) -> dict[str, Any]:
-        return self._servicio.verificar_certificado(oferta_id).as_dict()
+        return self._servicio.verificar_certificado(self._oferta_real(oferta_id)).as_dict()
 
 
 class BackendPinataSubidaLocalVerificacion:
@@ -524,32 +595,42 @@ class BackendPinataSubidaLocalVerificacion:
         self._servicio = CertificadoService(config, chain, almacen=almacen)
         self._almacen = almacen
         self._jwt = jwt
-        # Evidencia de integracion real: CID devuelto por Pinata por oferta.
+        self._sembrador = _SembradorVentaOnChain(chain)
+        self._ofertas: dict[int, int] = {}  # caso_id -> ofertaId real
+        # Evidencia de integracion real: CID devuelto por Pinata por caso.
         self.cids_pinata: dict[int, str] = {}
 
     def anclar_integro(self, oferta_id: int, datos_compra: dict[str, Any]) -> bytes:
         import pinata  # type: ignore[import-not-found]
         from pdf import generar_pdf  # type: ignore[import-not-found]
 
+        # 1) Sembrar venta real on-chain -> ofertaId real en estado Vendida.
+        token_id = 4_000_000 + int(oferta_id)
+        oferta_real = self._sembrador.sembrar_venta(oferta_id, token_id, KWH_CERTIFICADO)
+        self._ofertas[oferta_id] = oferta_real
+        # 2) Generar PDF; subida REAL a Pinata (integracion genuina).
         pdf_bytes = generar_pdf(oferta_id, datos_compra)
-        # Subida REAL a Pinata (integracion genuina). El CID es determinado por contenido, por
-        # lo que coincide con el que calcula el almacen local.
         cid_pinata = pinata.subir_pdf(pdf_bytes, jwt=self._jwt)
         self.cids_pinata[oferta_id] = cid_pinata
-        # Guardado local + anclaje on-chain via el servicio (config sin JWT -> guarda local).
-        self._servicio.emitir_certificado(oferta_id, datos_compra)
+        # 3) Guardar copia local y anclar su CID contra el ofertaId real.
+        cid_local = self._almacen.guardar(pdf_bytes)
+        self._servicio._anclar(oferta_real, cid_local)  # noqa: SLF001
         return pdf_bytes
 
+    def _oferta_real(self, oferta_id: int) -> int:
+        return self._ofertas.get(oferta_id, oferta_id)
+
     def sustituir_contenido(self, oferta_id: int, pdf_alterado: bytes) -> None:
-        cid_anclado = self._servicio._leer_cid_anclado(oferta_id)  # noqa: SLF001
+        oferta_real = self._oferta_real(oferta_id)
+        cid_anclado = self._servicio._leer_cid_anclado(oferta_real)  # noqa: SLF001
         if not cid_anclado:
-            raise RuntimeError(f"la oferta {oferta_id} no tiene CID anclado; no se puede alterar")
+            raise RuntimeError(f"la oferta {oferta_real} no tiene CID anclado; no se puede alterar")
         ruta = self._almacen._ruta(cid_anclado)  # noqa: SLF001
         ruta.write_bytes(bytes(pdf_alterado))
         self._almacen._blobs.pop(cid_anclado, None)  # noqa: SLF001
 
     def verificar(self, oferta_id: int) -> dict[str, Any]:
-        return self._servicio.verificar_certificado(oferta_id).as_dict()
+        return self._servicio.verificar_certificado(self._oferta_real(oferta_id)).as_dict()
 
 
 def construir_backend_pinata_local(

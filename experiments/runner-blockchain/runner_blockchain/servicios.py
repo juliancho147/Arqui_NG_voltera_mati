@@ -43,6 +43,8 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
+
+from . import progreso
 from urllib import error as urlerror
 from urllib import request as urlrequest
 
@@ -295,13 +297,18 @@ class Microservicios:
         """
         try:
             for spec in self.specs:
+                progreso.emitir("servicios", f"arrancando {spec.nombre} en :{spec.puerto}", exp="runner")
                 proceso = self._arrancar(spec)
                 ejecucion = ServicioEnEjecucion(spec=spec, proceso=proceso)
                 self.en_ejecucion.append(ejecucion)
                 self._esperar(spec, proceso=proceso, timeout_s=self._readiness_timeout_s)
+                progreso.emitir("servicios", f"{spec.nombre} listo", exp="runner",
+                                servicio=spec.nombre, puerto=spec.puerto,
+                                listos=len(self.en_ejecucion), total=len(self.specs))
         except Exception:
             self.detener()
             raise
+        progreso.emitir("servicios", f"{len(self.en_ejecucion)} microservicios listos", exp="runner")
         return list(self.en_ejecucion)
 
     def detener(self) -> None:

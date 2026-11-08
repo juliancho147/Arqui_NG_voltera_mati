@@ -41,6 +41,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from .reporte_modelo import FAIL, PASS, ExperimentResult, now_iso
+from . import progreso
 
 logger = logging.getLogger(__name__)
 
@@ -447,6 +448,11 @@ def escribir_reporte(
         json.dumps(doc, indent=2, ensure_ascii=False, default=str), encoding="utf-8"
     )
     (out / "report.md").write_text(to_markdown(report), encoding="utf-8")
+    try:
+        progreso.fin(report.verdict, report_dir=str(out),
+                     experimentos={e.experiment: e.verdict for e in report.experiments})
+    except Exception:
+        pass
     logger.info(
         "Reporte_Resultados de la corrida %s escrito en %s (veredicto=%s)",
         report.run_id,

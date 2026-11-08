@@ -1,0 +1,98 @@
+{
+  "runId": "RUN-MANIP",
+  "verdict": "PASS",
+  "header": {
+    "runId": "RUN-MANIP",
+    "inicio": "2026-11-07T09:05:37-0500",
+    "fin": "2026-11-07T09:05:37-0500",
+    "cantidades": {
+      "MANIP": {}
+    },
+    "repeticiones": {
+      "MANIP": 1
+    },
+    "contratos": {
+      "EnergyToken": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+      "MarketEscrow": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+    },
+    "herramientas": {
+      "foundry": "forge 1.9.0"
+    },
+    "params": {
+      "seleccion": "manip",
+      "chainId": 11155111,
+      "rpcUrl": "http://localhost:8545"
+    }
+  },
+  "fronteraOnOffChain": {
+    "onChain": "Emision de tokens (EnergyToken.emitir -> Emitido), atomicidad de la venta (MarketEscrow.comprar -> Compra) y anclaje del CID (MarketEscrow.anclar -> Anclado). Firmado por la plataforma (modelo custodial).",
+    "offChain": "Validacion del oraculo (ms_oraculo), generacion/verificacion del certificado por contenido (ms_certificado, con Pinata real + fallback local) y la orquestacion/medicion del runner. Las APIs de medidor y clima son stub."
+  },
+  "experiments": [
+    {
+      "experiment": "MANIP",
+      "title": "Pruebas negativas de manipulacion on-chain",
+      "hypothesis": "Todo intento de manipulacion (reanclar, emitir no autorizado, recomprar) revierte.",
+      "started": "2026-11-07T09:05:37-0500",
+      "finished": "2026-11-07T09:05:37-0500",
+      "params": {},
+      "criteria": [
+        {
+          "id": "CertificadoYaAnclado",
+          "title": "reanclar otro CID sobre compra ya anclada",
+          "status": "PASS",
+          "expected": "revierte (CertificadoYaAnclado)",
+          "observed": "('0x15742b510000000000000000000000000000000000000000000000000000000000000033', '0x15742b510000000000000000000000000000000000000000000000000000000000000033')",
+          "evidence": {}
+        },
+        {
+          "id": "SoloPlataforma",
+          "title": "emitir desde cuenta no autorizada",
+          "status": "PASS",
+          "expected": "revierte (SoloPlataforma)",
+          "observed": "('0xfe550097', '0xfe550097')",
+          "evidence": {}
+        },
+        {
+          "id": "OfertaNoDisponible",
+          "title": "comprar una oferta ya vendida",
+          "status": "PASS",
+          "expected": "revierte (OfertaNoDisponible)",
+          "observed": "('0xe0d675580000000000000000000000000000000000000000000000000000000000000034', '0xe0d675580000000000000000000000000000000000000000000000000000000000000034')",
+          "evidence": {}
+        }
+      ],
+      "notes": [
+        "Todos los intentos de manipulacion deben revertir; si alguno pasa, es un hallazgo."
+      ],
+      "data": {
+        "intentos": [
+          {
+            "descr": "reanclar otro CID sobre compra ya anclada",
+            "req": "CertificadoYaAnclado",
+            "revirtio": true,
+            "motivo": "('0x15742b510000000000000000000000000000000000000000000000000000000000000033', '0x15742b510000000000000000000000000000000000000000000000000000000000000033')"
+          },
+          {
+            "descr": "emitir desde cuenta no autorizada",
+            "req": "SoloPlataforma",
+            "revirtio": true,
+            "motivo": "('0xfe550097', '0xfe550097')"
+          },
+          {
+            "descr": "comprar una oferta ya vendida",
+            "req": "OfertaNoDisponible",
+            "revirtio": true,
+            "motivo": "('0xe0d675580000000000000000000000000000000000000000000000000000000000000034', '0xe0d675580000000000000000000000000000000000000000000000000000000000000034')"
+          }
+        ]
+      },
+      "error": null,
+      "verdict": "PASS",
+      "metricas": {},
+      "eventos": []
+    }
+  ],
+  "evidenciaOnChain": [],
+  "metricasIncumplidas": {}
+}

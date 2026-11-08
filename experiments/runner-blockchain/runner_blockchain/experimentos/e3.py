@@ -44,6 +44,7 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from ..eventos.lector import EventoOnChain, LectorEventos, LectorEventosError
+from .. import progreso
 from ..reporte_modelo import ExperimentResult, now_iso
 
 logger = logging.getLogger(__name__)
@@ -387,6 +388,9 @@ def ejecutar_escenario(
     oferta efectivamente publicada (base de la conservacion, R4.6).
     """
     out = ResultadoEjecucionE3()
+    total = len(casos)
+    progreso.emitir("inyeccion", f"E3: publicando {total} ofertas y disparando compras", exp="E3",
+                    ofertas=total)
     for caso in casos:
         # Siembra on-chain: emitir los kWh de la oferta al vendedor (fija precio + da balance)
         # para que publicar() no revierta por TokenSinPrecio ni por balance insuficiente.
@@ -404,6 +408,10 @@ def ejecutar_escenario(
         out.ofertas.append(oferta_id)
         out.tokens.append(caso.token_id)
         out.kwh_validados += caso.kwh
+        progreso.emitir("inyeccion", f"E3: oferta {len(out.ofertas)}/{total} publicada (id={oferta_id}), "
+                        f"disparando {len(caso.compradores)} compras concurrentes", exp="E3",
+                        ofertaId=oferta_id, publicadas=len(out.ofertas), ofertas=total,
+                        comprasPorOferta=len(caso.compradores))
         resultados = compra.comprar_concurrente(oferta_id, caso.compradores)
         out.confirmadas_reportadas[oferta_id] = sum(
             1 for r in resultados if isinstance(r, dict) and r.get("exito")

@@ -6,24 +6,23 @@ endobj
 << /Type /Pages /Kids [3 0 R] /Count 1 >>
 endobj
 3 0 obj
-<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >ý /Contents 5 0 R >>
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
 endobj
 4 0 obj
 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
 endobj
 5 0 obj
-<< /Length 215 >>
+<< /Length 175 >>
 stream
 BT
 /F1 12 Tf
 72 720 Td
 14 TL
 (Certificado de compra de energia - Voltera) Tj
-T* (Oferta: 4) Tj
-T* (comprador: 0x0000000000000000000000000000000000000004) Tj
-T* (kwh: 104) Tj
-T* (ofertaId: 4) Tj
-T* (precio: 10) Tj
+T* (Oferta: 4007) Tj
+T* (nonce: 253253458) Tj
+T* (ofertaOriginal: 4) Tj
+T* (reemplazo: True) Tj
 ET
 endstream
 endobj
@@ -38,5 +37,5 @@ xref
 trailer
 << /Size 6 /Root 1 0 R >>
 startxref
-577
+537
 %%EOF

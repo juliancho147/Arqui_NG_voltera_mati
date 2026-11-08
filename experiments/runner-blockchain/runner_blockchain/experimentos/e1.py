@@ -47,6 +47,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Iterable
 
 from ..eventos.lector import EventoOnChain, LectorEventos, LectorEventosError
+from .. import progreso
 from ..reporte_modelo import ExperimentResult, now_iso
 
 logger = logging.getLogger(__name__)
@@ -558,9 +559,16 @@ def ejecutar_e1(
 
     # --- Inyeccion de casos ---------------------------------------------------
     resultados: list[ResultadoInyeccion] = []
+    total_casos = len(dataset.casos)
+    progreso.emitir("inyeccion", f"E1: inyectando {total_casos} lecturas "
+                    f"({len(dataset.validas)} validas + {len(dataset.invalidas)} invalidas)",
+                    exp="E1", total=total_casos)
     try:
-        for caso in dataset.casos:
+        for i, caso in enumerate(dataset.casos, 1):
             resultados.append(_post(url_oraculo, caso))
+            if i % 50 == 0 or i == total_casos:
+                progreso.emitir("inyeccion", f"E1: {i}/{total_casos} lecturas inyectadas",
+                                exp="E1", inyectadas=i, total=total_casos)
     except E1Error as exc:
         # Indisponibilidad de cadena/oraculo durante E1 -> abortar con FAIL (R2.9).
         resultado.error = f"indisponibilidad durante E1: {exc}"

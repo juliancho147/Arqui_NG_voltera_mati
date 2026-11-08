@@ -37,6 +37,7 @@ except Exception:  # pragma: no cover - requests siempre esta por web3, pero no 
     RequestException = ()  # type: ignore[assignment]
 
 from ..chain.chain_client import ChainClient
+from .. import progreso
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +157,14 @@ class LectorEventos:
 
         eventos.sort(key=lambda e: (e.block_number, e.log_index if e.log_index is not None else 0))
         logger.info("Lector_Eventos: %d eventos observados en la corrida %s", len(eventos), run_id)
+        try:
+            _tipos: dict[str, int] = {}
+            for _e in eventos:
+                _tipos[_e.tipo] = _tipos.get(_e.tipo, 0) + 1
+            progreso.emitir("eventos", f"Lector_Eventos: {len(eventos)} eventos on-chain observados",
+                            exp="runner", total=len(eventos), porTipo=_tipos)
+        except Exception:
+            pass
         return eventos
 
     # ---- helpers internos ----------------------------------------------------
